@@ -30,7 +30,9 @@ router = APIRouter()
 def signup(user: UserCreate):
     with Session(engine) as session:
         # Check for existing user with same username or email
-        # TODO: Add check if is_verified is true then only reject, else delete the user and create new one
+        # TODO: The problem is if someone creates account without verifying, the id will be given to it
+        # so if we want to implement something like first 100, then we need to rely on id
+        # TODO: add created_at and updated_at fields
         results = session.exec(
             select(User).where(
                 or_(User.username == user.username, User.email == user.email)
@@ -39,14 +41,20 @@ def signup(user: UserCreate):
         existing_user = results.first()
 
         if existing_user:
-            if existing_user.username == user.username:
+            if not existing_user.is_verified:
+                # Delete existing user and create new one
+                session.delete(existing_user)
+                session.commit()
+            elif existing_user.username == user.username and existing_user.is_verified:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail="Username already exists",
                 )
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT, detail="Email already exists"
-            )
+            elif existing_user.email == user.email:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="Email already exists and is verified",
+                    )
 
         # Hash password and create user
         hashed = bcrypt.hashpw(user.password.encode("utf-8"), bcrypt.gensalt())
