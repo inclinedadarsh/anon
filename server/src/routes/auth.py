@@ -111,3 +111,39 @@ def login(login_user: UserLoginRequest):
             algorithm="HS256",
         )
         return {"access_token": token, "token_type": "bearer"}
+
+
+@router.get("/verify-token", tags=["auth"], status_code=status.HTTP_200_OK, response_model=UserPublic)
+def verify_token(token: str):
+    with Session(engine) as session:
+        # Fetch user by verification token
+        results = session.exec(select(User).where(User.verification_token == token))
+        user = results.first()
+
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or Expired token",
+            )
+
+        # Ensure token expiry datetime is timezone-aware
+        token_expires = user.verification_token_expires
+        if token_expires.tzinfo is None:
+            token_expires = token_expires.replace(tzinfo=timezone.utc)
+
+        # Compare timezone-aware datetimes
+        if token_expires < datetime.now(timezone.utc):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token has expired",
+            )
+
+        # Update user to be verified
+        user.is_verified = True
+        user.verification_token = None  # Clear the token after use
+        user.verification_token_expires = None  # Clear the expiry after use
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+
+        return user
