@@ -107,13 +107,27 @@ def login(login_user: UserLoginRequest):
         results = session.exec(select(User).where(User.email == login_user.email))
         user = results.first()
 
+        # Validate user exists
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password",
+            )
+        
+        # Validate user is verified
+        if not user.is_verified:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User is not verified! Please verify your email before logging in",
+            )
+
         # Validate user exists and password matches
-        if not user or not bcrypt.checkpw(
+        if not bcrypt.checkpw(
             login_user.password.encode("utf-8"), user.hashed_password
         ):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid username or password",
+                detail="Invalid email or password",
             )
 
         # Generate JWT token
