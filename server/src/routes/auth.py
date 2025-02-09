@@ -28,63 +28,68 @@ router = APIRouter()
     status_code=status.HTTP_201_CREATED,
 )
 def signup(user: UserCreate):
-    with Session(engine) as session:
-        # Check for existing user with same username or email
-        # TODO: The problem is if someone creates account without verifying, the id will be given to it
-        # so if we want to implement something like first 100, then we need to rely on id
-        # TODO: add created_at and updated_at fields
-        results = session.exec(
-            select(User).where(
-                or_(User.username == user.username, User.email == user.email)
-            )
-        )
-        existing_user = results.first()
-
-        if existing_user:
-            if not existing_user.is_verified:
-                # Delete existing user and create new one
-                session.delete(existing_user)
-                session.commit()
-            elif existing_user.username == user.username and existing_user.is_verified:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="Username already exists",
+    try:
+        with Session(engine) as session:
+            # Check for existing user with same username or email
+            # TODO: The problem is if someone creates account without verifying, the id will be given to it
+            # so if we want to implement something like first 100, then we need to rely on id
+            # TODO: add created_at and updated_at fields
+            results = session.exec(
+                select(User).where(
+                    or_(User.username == user.username, User.email == user.email)
                 )
-            elif existing_user.email == user.email:
+            )
+            existing_user = results.first()
+
+            if existing_user:
+                if not existing_user.is_verified:
+                    # Delete existing user and create new one
+                    session.delete(existing_user)
+                    session.commit()
+                elif existing_user.username == user.username and existing_user.is_verified:
                     raise HTTPException(
                         status_code=status.HTTP_409_CONFLICT,
-                        detail="Email already exists and is verified",
+                        detail="Username already exists",
                     )
+                elif existing_user.email == user.email:
+                        raise HTTPException(
+                            status_code=status.HTTP_409_CONFLICT,
+                            detail="Email already exists and is verified",
+                        )
 
-        # Hash password and create user
-        hashed = bcrypt.hashpw(user.password.encode("utf-8"), bcrypt.gensalt())
+            # Hash password and create user
+            hashed = bcrypt.hashpw(user.password.encode("utf-8"), bcrypt.gensalt())
 
-        # Generate verification token
-        token = secrets.token_urlsafe(32)
-        token_expiry = datetime.now(timezone.utc) + timedelta(minutes=15)
+            # Generate verification token
+            token = secrets.token_urlsafe(32)
+            token_expiry = datetime.now(timezone.utc) + timedelta(minutes=15)
 
-        # Send email with verification token
-        resend.api_key = os.getenv("RESEND_API_KEY")
-        params : resend.Emails.SendParams = {
-            # TODO: Should this be static here or should it be coming from .env?
-            "from": "anon@adarshdubey.com",
-            "to": user.email,
-            "subject": "Verify your email for Anon",
-            # TODO: Make this dynamic for production and development
-            "text": f"Click here to verify your email: http://127.0.0.1:8000/auth/verify-token?token={token}",
-        }
+            # Send email with verification token
+            resend.api_key = os.getenv("RESEND_API_KEY")
+            params : resend.Emails.SendParams = {
+                # TODO: Should this be static here or should it be coming from .env?
+                "from": "anon@adarshdubey.com",
+                "to": user.email,
+                "subject": "Verify your email for Anon",
+                # TODO: Make this dynamic for production and development
+                "text": f"Click here to verify your email: http://127.0.0.1:8000/auth/verify-token?token={token}",
+            }
 
-        email: resend.Email = resend.Emails.send(params)
-        print(email)
+            email: resend.Email = resend.Emails.send(params)
+            print(email)
 
-        # Save user to database
-        db_user = User(username=user.username, email=user.email, hashed_password=hashed, verification_token=token, verification_token_expires=token_expiry)
-        session.add(db_user)
-        session.commit()
-        session.refresh(db_user)
+            # Save user to database
+            db_user = User(username=user.username, email=user.email, hashed_password=hashed, verification_token=token, verification_token_expires=token_expiry)
+            session.add(db_user)
+            session.commit()
+            session.refresh(db_user)
 
-
-        return db_user
+            return db_user
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
 
 
 @router.post(

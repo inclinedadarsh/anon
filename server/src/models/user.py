@@ -1,12 +1,23 @@
 from sqlmodel import SQLModel, Field
 from datetime import datetime
 from typing import Optional
-from pydantic import EmailStr
+from pydantic import EmailStr, field_validator
+import re
 
 
 class UserBase(SQLModel):
-    email: EmailStr
+    email: EmailStr = Field(
+        ...,
+        description="Email must be from @kkwagh.edu.in domain",
+    )
     username: str
+
+    @field_validator('email')
+    def validate_kkwagh_email(cls, v):
+        pattern = r'^[a-zA-Z0-9_.+-]+@kkwagh\.edu\.in$'
+        if not re.match(pattern, v):
+            raise ValueError('Email must be from @kkwagh.edu.in domain')
+        return v
 
 
 class User(UserBase, table=True):
