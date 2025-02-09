@@ -98,7 +98,7 @@ def signup(user: UserCreate):
     status_code=status.HTTP_200_OK,
     response_model=UserLoginResponse,
 )
-def login(login_user: UserLoginRequest):
+async def login(login_user: UserLoginRequest):
     """
     Authenticate user by username and password, and return a JWT token.
     """
