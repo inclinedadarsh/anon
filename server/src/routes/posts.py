@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from src.models.post import PostPublic, PostCreate, Post
 from src.models.user import User
 from src.services.auth import get_current_user
@@ -25,3 +25,12 @@ def get_posts():
     with Session(engine) as session:
         posts = session.exec(select(Post)).all()
         return posts
+
+
+@router.get("/{post_id}", response_model=PostPublic)
+def get_post(post_id: int):
+    with Session(engine) as session:
+        post = session.exec(select(Post).where(Post.id == post_id)).first()
+        if post is None:
+            raise HTTPException(status_code=404, detail="Post not found")
+        return post
