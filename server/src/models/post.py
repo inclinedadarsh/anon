@@ -23,7 +23,11 @@ class PostCreate(PostBase):
     pass
 
 
+class Author(SQLModel):
+    author_id: int
+    username: str
+
 class PostPublic(PostBase):
     id: int
-    author_id: int
     created_at: datetime
+    author: Author
