@@ -15,6 +15,7 @@ from dotenv import load_dotenv, find_dotenv
 import secrets
 from datetime import datetime, timezone, timedelta
 import resend
+from src.services.email import load_email_template
 
 load_dotenv(find_dotenv())
 
@@ -65,6 +66,8 @@ def signup(user: UserCreate):
             token_expiry = datetime.now(timezone.utc) + timedelta(minutes=15)
 
             # Send email with verification token
+            verification_link = f"http://127.0.0.1:8000/auth/verify-token?token={token}" 
+            email_html = load_email_template("verification.html", verification_link=verification_link)
             resend.api_key = os.getenv("RESEND_API_KEY")
             params : resend.Emails.SendParams = {
                 # TODO: Should this be static here or should it be coming from .env?
@@ -72,7 +75,7 @@ def signup(user: UserCreate):
                 "to": user.email,
                 "subject": "Verify your email for Anon",
                 # TODO: Make this dynamic for production and development
-                "text": f"Click here to verify your email: http://127.0.0.1:8000/auth/verify-token?token={token}",
+                "html": email_html,
             }
 
             email: resend.Email = resend.Emails.send(params)
