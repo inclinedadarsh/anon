@@ -29,6 +29,9 @@ router = APIRouter()
     status_code=status.HTTP_201_CREATED,
 )
 def signup(user: UserCreate):
+    """
+    Create a new user with a hashed password and return the user.
+    """
     try:
         with Session(engine) as session:
             # Check for existing user with same username or email
@@ -145,6 +148,9 @@ async def login(login_user: UserLoginRequest):
 
 @router.get("/verify-token", tags=["auth"], status_code=status.HTTP_200_OK, response_model=UserPublic)
 def verify_token(token: str):
+    """
+    Verify user by token and return the user.
+    """
     with Session(engine) as session:
         # Fetch user by verification token
         results = session.exec(select(User).where(User.verification_token == token))

@@ -11,6 +11,9 @@ router = APIRouter()
 
 @router.post("/", response_model=PostPublic)
 def post_posts(post: PostCreate, user: User = Depends(get_current_user)):
+    """
+    Create a new post with the current user as the author
+    """
     with Session(engine) as session:
         post_create = Post(**post.model_dump(), author_id=user.id)
         db_post = Post.model_validate(post_create)
@@ -27,6 +30,9 @@ def post_posts(post: PostCreate, user: User = Depends(get_current_user)):
 
 @router.get("/", response_model=List[PostPublic])
 def get_posts():
+    """
+    Get all posts with their authors
+    """
     with Session(engine) as session:
         statement = select(Post, User).join(User, Post.author_id == User.id)
         results = session.exec(statement).all()
@@ -44,6 +50,9 @@ def get_posts():
 
 @router.get("/{post_id}", response_model=PostPublic)
 def get_post(post_id: int):
+    """
+    Get a post by its ID with its author
+    """
     with Session(engine) as session:
         post = session.exec(select(Post).where(Post.id == post_id)).first()
         if post is None:

@@ -8,6 +8,9 @@ router = APIRouter()
 
 @router.get("/", response_model=List[UserPublic], status_code=status.HTTP_200_OK)
 def get_users():
+    """
+    Get all users
+    """
     with Session(engine) as session:
         users = session.exec(select(User)).all()
         return users
@@ -15,6 +18,9 @@ def get_users():
 
 @router.get("/{username}", response_model=UserPublic, status_code=status.HTTP_200_OK)
 def get_user(username: str):
+    """
+    Get a user by their username
+    """
     with Session(engine) as session:
         user = session.exec(select(User).where(User.username == username)).first()
         if user is None:
