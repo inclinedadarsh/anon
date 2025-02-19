@@ -65,3 +65,24 @@ def get_post(post_id: int):
             author=Author(author_id=author.id, username=author.username)
         )
         return post_public
+
+
+@router.delete("/{post_id}", response_model=PostPublic)
+def delete_post(post_id: int, user: User = Depends(get_current_user) ):
+    """
+    Delete a post by its ID
+    """
+    with Session(engine) as session:
+        post = session.exec(select(Post).where(Post.id == post_id)).first()
+        if post is None:
+            raise HTTPException(status_code=404, detail="Post not found")
+        if post.author_id != user.id:
+            raise HTTPException(status_code=403, detail="You are not the author of this post")
+        session.delete(post)
+        session.commit()
+        author = session.exec(select(User).where(User.id == post.author_id)).first()
+        post_public = PostPublic(
+            **post.model_dump(),
+            author=Author(author_id=author.id, username=author.username)
+        )
+        return post_public
