@@ -3,16 +3,26 @@ from datetime import datetime
 from typing import Optional
 from pydantic import EmailStr, field_validator
 import re
-from sqlalchemy import LargeBinary  # Add this import
+from sqlalchemy import LargeBinary
 
 
 class UserBase(SQLModel):
-    email: EmailStr = Field(
-        ...,
-        description="Email must be from @kkwagh.edu.in domain",
-    )
-    # TODO: Add some validation for email, like minimum length and allowed characters
     username: str
+
+
+class User(UserBase, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    is_verified: bool = Field(default=False)
+    hashed_email: bytes = Field(sa_type=LargeBinary, unique=True, index=True)
+    hashed_password: bytes = Field(sa_type=LargeBinary)
+    verification_token: Optional[str] = Field(nullable=True)
+    verification_token_expires: Optional[datetime] = Field(nullable=True)
+
+
+class UserCreate(SQLModel):
+    username: str
+    email: EmailStr = Field(description="Email must be from @kkwagh.edu.in domain")
+    password: str
 
     @field_validator('email')
     def validate_kkwagh_email(cls, v):
@@ -20,18 +30,6 @@ class UserBase(SQLModel):
         if not re.match(pattern, v):
             raise ValueError('Email must be from @kkwagh.edu.in domain')
         return v
-
-
-class User(UserBase, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    is_verified: Optional[bool] = Field(default=False)
-    hashed_password: bytes = Field(sa_type=LargeBinary)  # Change this line
-    verification_token: Optional[str] = Field(nullable=True)
-    verification_token_expires: Optional[datetime] = Field(nullable=True)
-
-
-class UserCreate(UserBase):
-    password: str
 
 
 class UserPublic(UserBase):

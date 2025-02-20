@@ -16,38 +16,37 @@ import secrets
 from datetime import datetime, timezone, timedelta
 import resend
 from src.services.email import load_email_template
+from src.services.auth import hash_email
 
 load_dotenv(find_dotenv())
 
 router = APIRouter()
 
 
-@router.post(
-    "/signup",
-    tags=["auth"],
-    response_model=UserPublic,
-    status_code=status.HTTP_201_CREATED,
-)
+@router.post("/signup", tags=["auth"], response_model=UserPublic, status_code=status.HTTP_201_CREATED)
 def signup(user: UserCreate):
-    """
-    Create a new user with a hashed password and return the user.
-    """
+    """Create a new user with a hashed password and return the user."""
     try:
         with Session(engine) as session:
+            # Hash the email first
+            hashed_email = hash_email(user.email)
             # Check for existing user with same username or email
             # TODO: The problem is if someone creates account without verifying, the id will be given to it
             # so if we want to implement something like first 100, then we need to rely on id
             # TODO: add created_at and updated_at fields
+            # Check for existing user with same username or hashed email
             results = session.exec(
                 select(User).where(
-                    or_(User.username == user.username, User.email == user.email)
+                    or_(
+                        User.username == user.username,
+                        User.hashed_email == hashed_email
+                    )
                 )
             )
             existing_user = results.first()
 
             if existing_user:
                 if not existing_user.is_verified:
-                    # Delete existing user and create new one
                     session.delete(existing_user)
                     session.commit()
                 # elif existing_user.username == user.username and existing_user.is_verified:
@@ -57,37 +56,42 @@ def signup(user: UserCreate):
                         status_code=status.HTTP_409_CONFLICT,
                         detail="Username already exists",
                     )
-                elif existing_user.email == user.email:
-                        raise HTTPException(
-                            status_code=status.HTTP_409_CONFLICT,
-                            detail="Email already exists and is verified",
-                        )
+                elif existing_user.hashed_email == hashed_email:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="Email already exists and is verified",
+                    )
 
-            # Hash password and create user
-            hashed = bcrypt.hashpw(user.password.encode(), bcrypt.gensalt())
+            # Hash password
+            hashed_password = bcrypt.hashpw(user.password.encode(), bcrypt.gensalt())
 
             # Generate verification token
             token = secrets.token_urlsafe(32)
             token_expiry = datetime.now(timezone.utc) + timedelta(minutes=15)
 
-            # Send email with verification token
-            verification_link = f"http://127.0.0.1:8000/auth/verify-token?token={token}" 
+            # Send verification email
+            verification_link = f"http://127.0.0.1:8000/auth/verify-token?token={token}"
             email_html = load_email_template("verification.html", verification_link=verification_link)
             resend.api_key = os.getenv("RESEND_API_KEY")
-            params : resend.Emails.SendParams = {
-                # TODO: Should this be static here or should it be coming from .env?
+            
+            params: resend.Emails.SendParams = {
                 "from": "anon@adarshdubey.com",
                 "to": user.email,
                 "subject": "Verify your email for Anon",
-                # TODO: Make this dynamic for production and development
                 "html": email_html,
             }
 
             email: resend.Email = resend.Emails.send(params)
             print(email)
 
-            # Save user to database
-            db_user = User(username=user.username, email=user.email, hashed_password=hashed, verification_token=token, verification_token_expires=token_expiry)
+            # Create and save user
+            db_user = User(
+                username=user.username,
+                hashed_email=hashed_email,
+                hashed_password=hashed_password,
+                verification_token=token,
+                verification_token_expires=token_expiry
+            )
             session.add(db_user)
             session.commit()
             session.refresh(db_user)
