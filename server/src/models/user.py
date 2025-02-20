@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Optional
 from pydantic import EmailStr, field_validator
 import re
+from sqlalchemy import LargeBinary  # Add this import
 
 
 class UserBase(SQLModel):
@@ -24,7 +25,7 @@ class UserBase(SQLModel):
 class User(UserBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     is_verified: Optional[bool] = Field(default=False)
-    hashed_password: str
+    hashed_password: bytes = Field(sa_type=LargeBinary)  # Change this line
     verification_token: Optional[str] = Field(nullable=True)
     verification_token_expires: Optional[datetime] = Field(nullable=True)
 

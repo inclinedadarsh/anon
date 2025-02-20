@@ -64,7 +64,7 @@ def signup(user: UserCreate):
                         )
 
             # Hash password and create user
-            hashed = bcrypt.hashpw(user.password.encode("utf-8"), bcrypt.gensalt())
+            hashed = bcrypt.hashpw(user.password.encode(), bcrypt.gensalt())
 
             # Generate verification token
             token = secrets.token_urlsafe(32)
@@ -131,7 +131,7 @@ async def login(login_user: UserLoginRequest):
 
         # Validate user exists and password matches
         if not bcrypt.checkpw(
-            login_user.password.encode("utf-8"), user.hashed_password
+            login_user.password.encode(), user.hashed_password
         ):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
