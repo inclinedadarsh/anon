@@ -50,7 +50,9 @@ def signup(user: UserCreate):
                     # Delete existing user and create new one
                     session.delete(existing_user)
                     session.commit()
-                elif existing_user.username == user.username and existing_user.is_verified:
+                # elif existing_user.username == user.username and existing_user.is_verified:
+                # TODO: Fix race condition, right now we're just locking the username for saftey
+                elif existing_user.username == user.username:
                     raise HTTPException(
                         status_code=status.HTTP_409_CONFLICT,
                         detail="Username already exists",
@@ -109,15 +111,15 @@ async def login(login_user: UserLoginRequest):
     Authenticate user by username and password, and return a JWT token.
     """
     with Session(engine) as session:
-        # Fetch user by email
-        results = session.exec(select(User).where(User.email == login_user.email))
+        # Fetch user by username
+        results = session.exec(select(User).where(User.username == login_user.username))
         user = results.first()
 
         # Validate user exists
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email or password",
+                detail="Invalid username or password",
             )
         
         # Validate user is verified
@@ -133,13 +135,13 @@ async def login(login_user: UserLoginRequest):
         ):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email or password",
+                detail="Invalid username or password",
             )
 
         # Generate JWT token
         JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
         token = jwt.encode(
-            {"email": user.email, "id": str(user.id)},
+            {"username": user.username, "id": str(user.id)},
             key=JWT_SECRET_KEY,
             algorithm="HS256",
         )

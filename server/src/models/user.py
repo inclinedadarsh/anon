@@ -10,6 +10,7 @@ class UserBase(SQLModel):
         ...,
         description="Email must be from @kkwagh.edu.in domain",
     )
+    # TODO: Add some validation for email, like minimum length and allowed characters
     username: str
 
     @field_validator('email')
@@ -38,7 +39,7 @@ class UserPublic(UserBase):
 
 
 class UserLoginRequest(SQLModel):
-    email: EmailStr
+    username: str
     password: str
 
 
