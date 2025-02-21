@@ -1,12 +1,14 @@
 from sqlmodel import SQLModel, create_engine
 from src.models.post import Post
 from src.models.user import User
+from dotenv import load_dotenv, find_dotenv
+import os
 
-sqlite_file_name = "anon"
-sqlite_url = f"postgresql://adarsh:root@127.0.0.1:5432/{sqlite_file_name}"
-# TODO: Make this come from .env file
+load_dotenv(find_dotenv())
 
-engine = create_engine(sqlite_url, echo=True)
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+engine = create_engine(DATABASE_URL, echo=True)
 
 
 def create_db_and_tables():
