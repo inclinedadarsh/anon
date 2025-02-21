@@ -7,6 +7,7 @@ from sqlalchemy import LargeBinary
 
 
 class UserBase(SQLModel):
+    # TODO: Give it constraints
     username: str
 
 
