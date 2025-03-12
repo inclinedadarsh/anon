@@ -1,9 +1,10 @@
 from sqlmodel import SQLModel, Field
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from pydantic import EmailStr, field_validator
 import re
-from sqlalchemy import LargeBinary
+from sqlalchemy import LargeBinary, String, Column
+from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
 
 
 class UserBase(SQLModel):
@@ -18,6 +19,12 @@ class User(UserBase, table=True):
     hashed_password: bytes = Field(sa_type=LargeBinary)
     verification_token: Optional[str] = Field(nullable=True)
     verification_token_expires: Optional[datetime] = Field(nullable=True)
+    tags: Optional[List[str]] = Field(default=None, sa_column=Column(PG_ARRAY(String())))
+    # NOTE: The `tags` property is just an array of strings, however it should have been an array of
+    # foreign keys "tag.key"
+    # As of 12/3/25, it's not supported in SQLAlchemy / SQLModel, hence it's just an array of strings
+    # As a result of this, we have to implement referential integrity manually.
+    # Similarly, we have to implement backpopulate manually for this.
 
 
 class UserCreate(SQLModel):
@@ -36,6 +43,7 @@ class UserCreate(SQLModel):
 class UserPublic(UserBase):
     id: int
     is_verified: bool
+    tags: Optional[List[str]] = None
 
 
 class UserLoginRequest(SQLModel):
