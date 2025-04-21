@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import desc
 from src.models.post import PostPublic, PostCreate, Post, Author
 from src.models.user import User
 from src.services.auth import get_current_user
@@ -29,12 +30,12 @@ def post_posts(post: PostCreate, user: User = Depends(get_current_user)):
 
 
 @router.get("/", response_model=List[PostPublic])
-def get_posts():
+def get_posts(user: User = Depends(get_current_user)):
     """
     Get all posts with their authors
     """
     with Session(engine) as session:
-        statement = select(Post, User).join(User, Post.author_id == User.id)
+        statement = select(Post, User).join(User, Post.author_id == User.id).order_by(desc(Post.created_at))
         results = session.exec(statement).all()
         posts_public = [
             PostPublic(
@@ -49,7 +50,7 @@ def get_posts():
 
 
 @router.get("/{post_id}", response_model=PostPublic)
-def get_post(post_id: int):
+def get_post(post_id: int, user: User = Depends(get_current_user)):
     """
     Get a post by its ID with its author
     """

@@ -4,9 +4,21 @@ from src.routes.posts import router as posts_router
 from src.routes.auth import router as auth_router
 from src.routes.users import router as users_router
 from src.routes.test import router as test_router
+from fastapi.middleware.cors import CORSMiddleware
+import os
 
 app = FastAPI()
-
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+origins = [
+    FRONTEND_URL,
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.on_event("startup")
 def on_startup():
