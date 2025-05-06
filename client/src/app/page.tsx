@@ -11,11 +11,9 @@ export default function Home() {
 					Login with your KKWagh Google Account to continue.
 				</p>
 				<a href={backendLoginUrl}>
-					<Button size="lg">
-						Login with Google
-					</Button>
+					<Button size="lg">Login with Google</Button>
 				</a>
 			</div>
 		</main>
-	)
+	);
 }
