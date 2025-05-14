@@ -34,6 +34,9 @@ export default function ProfilePage() {
 	const [isEditingBio, setIsEditingBio] = useState(false);
 	const [newBio, setNewBio] = useState("");
 	const [isSavingBio, setIsSavingBio] = useState(false);
+	const [currentPage, setCurrentPage] = useState(1);
+	const [totalPosts, setTotalPosts] = useState(0);
+	const postsPerPage = 10;
 	const { toast } = useToast();
 
 	useEffect(() => {
@@ -76,8 +79,9 @@ export default function ProfilePage() {
 			setLoadingPosts(true);
 			setErrorPosts(null);
 			try {
+				const offset = (currentPage - 1) * postsPerPage;
 				const res = await fetch(
-					`${backendUrl}/posts/user/${username}`,
+					`${backendUrl}/posts/user/${username}?limit=${postsPerPage}&offset=${offset}`,
 					{
 						credentials: "include",
 					},
@@ -86,7 +90,8 @@ export default function ProfilePage() {
 					throw new Error("Could not fetch user's posts");
 				}
 				const data = await res.json();
-				setPosts(data);
+				setPosts(data.items);
+				setTotalPosts(data.total);
 			} catch (err: unknown) {
 				setErrorPosts(
 					err instanceof Error ? err.message : "Failed to load posts",
@@ -96,7 +101,7 @@ export default function ProfilePage() {
 			}
 		};
 		fetchUserPosts();
-	}, [username, backendUrl, currentUser]);
+	}, [username, backendUrl, currentUser, currentPage]);
 
 	const getInitials = (name: string | null | undefined) =>
 		name?.charAt(0).toUpperCase() || "?";
@@ -225,27 +230,73 @@ export default function ProfilePage() {
 				{errorPosts && (
 					<p className="text-center text-destructive">{errorPosts}</p>
 				)}
-				{!loadingPosts && !errorPosts && posts.length === 0 && (
-					<p className="text-center text-muted-foreground">
-						No posts yet.
-					</p>
+				{!loadingPosts &&
+					!errorPosts &&
+					posts &&
+					posts.length === 0 && (
+						<p className="text-center text-muted-foreground">
+							No posts yet.
+						</p>
+					)}
+				{!loadingPosts && !errorPosts && posts && posts.length > 0 && (
+					<>
+						<div className="space-y-4">
+							{posts.map(post => (
+								<PostItem
+									key={post.id}
+									post={post}
+									getInitials={getInitials}
+									formatDate={date =>
+										new Date(date).toLocaleString(
+											undefined,
+											{
+												dateStyle: "medium",
+												timeStyle: "short",
+												hour12: true,
+											},
+										)
+									}
+								/>
+							))}
+						</div>
+						{Math.ceil(totalPosts / postsPerPage) > 1 && (
+							<div className="flex justify-center gap-2 mt-4">
+								<Button
+									variant="outline"
+									onClick={() =>
+										setCurrentPage(p => Math.max(1, p - 1))
+									}
+									disabled={currentPage === 1}
+								>
+									Previous
+								</Button>
+								<span className="flex items-center px-4">
+									Page {currentPage} of{" "}
+									{Math.ceil(totalPosts / postsPerPage)}
+								</span>
+								<Button
+									variant="outline"
+									onClick={() =>
+										setCurrentPage(p =>
+											Math.min(
+												Math.ceil(
+													totalPosts / postsPerPage,
+												),
+												p + 1,
+											),
+										)
+									}
+									disabled={
+										currentPage ===
+										Math.ceil(totalPosts / postsPerPage)
+									}
+								>
+									Next
+								</Button>
+							</div>
+						)}
+					</>
 				)}
-				<div className="space-y-4">
-					{posts.map(post => (
-						<PostItem
-							key={post.id}
-							post={post}
-							getInitials={getInitials}
-							formatDate={date =>
-								new Date(date).toLocaleString(undefined, {
-									dateStyle: "medium",
-									timeStyle: "short",
-									hour12: true,
-								})
-							}
-						/>
-					))}
-				</div>
 			</section>
 		</PageLayout>
 	);

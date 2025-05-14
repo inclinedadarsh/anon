@@ -1,11 +1,22 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import desc
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import desc, func
 from src.models.post import PostPublic, PostCreate, Post, Author
 from src.models.user import User
 from src.services.auth import get_current_user
 from src.db import engine
 from sqlmodel import Session, select
-from typing import List
+from typing import List, Generic, TypeVar
+from pydantic import BaseModel
+
+T = TypeVar("T")
+
+
+class PaginatedResponse(BaseModel, Generic[T]):
+    items: List[T]
+    total: int
+    limit: int
+    offset: int
+
 
 router = APIRouter()
 
@@ -29,16 +40,24 @@ def post_posts(post: PostCreate, user: User = Depends(get_current_user)):
         return post_public
 
 
-@router.get("/", response_model=List[PostPublic])
-def get_posts(user: User = Depends(get_current_user)):
+@router.get("/", response_model=PaginatedResponse[PostPublic])
+def get_posts(
+    user: User = Depends(get_current_user),
+    limit: int = Query(default=10, ge=1, le=50),
+    offset: int = Query(default=0, ge=0),
+):
     """
-    Get all posts with their authors
+    Get paginated posts with their authors
     """
     with Session(engine) as session:
+        total_count = session.exec(select(func.count()).select_from(Post)).first()
+
         statement = (
             select(Post, User)
             .join(User, Post.author_id == User.id)
             .order_by(desc(Post.created_at))
+            .offset(offset)
+            .limit(limit)
         )
         results = session.exec(statement).all()
         posts_public = [
@@ -50,7 +69,12 @@ def get_posts(user: User = Depends(get_current_user)):
             )
             for post, user in results
         ]
-        return posts_public
+        return PaginatedResponse(
+            items=posts_public,
+            total=total_count,
+            limit=limit,
+            offset=offset,
+        )
 
 
 @router.get("/{post_id}", response_model=PostPublic)
@@ -95,19 +119,32 @@ def delete_post(post_id: int, user: User = Depends(get_current_user)):
         return post_public
 
 
-@router.get("/user/{username}", response_model=List[PostPublic])
-def get_posts_by_username(username: str, user: User = Depends(get_current_user)):
+@router.get("/user/{username}", response_model=PaginatedResponse[PostPublic])
+def get_posts_by_username(
+    username: str,
+    user: User = Depends(get_current_user),
+    limit: int = Query(default=10, ge=1, le=50),
+    offset: int = Query(default=0, ge=0),
+):
     """
-    Get all posts by a specific username
+    Get paginated posts by a specific username
     """
     with Session(engine) as session:
         author = session.exec(select(User).where(User.username == username)).first()
         if author is None:
             raise HTTPException(status_code=404, detail="User not found")
+
+        
+        total_count = session.exec(
+            select(func.count()).select_from(Post).where(Post.author_id == author.id)
+        ).first()
+
         statement = (
             select(Post)
             .where(Post.author_id == author.id)
             .order_by(desc(Post.created_at))
+            .offset(offset)
+            .limit(limit)
         )
         posts = session.exec(statement).all()
         posts_public = [
@@ -119,4 +156,9 @@ def get_posts_by_username(username: str, user: User = Depends(get_current_user))
             )
             for post in posts
         ]
-        return posts_public
+        return PaginatedResponse(
+            items=posts_public,
+            total=total_count,
+            limit=limit,
+            offset=offset,
+        )

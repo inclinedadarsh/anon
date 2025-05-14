@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { UserRound } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useState } from "react";
 import PostItem, { type FetchedPost } from "./PostItem";
 
 interface UserProfile {
@@ -36,6 +36,13 @@ interface PostAuthor {
 	username: string;
 }
 
+interface PaginatedResponse {
+	items: FetchedPost[];
+	total: number;
+	limit: number;
+	offset: number;
+}
+
 export default function HomePage() {
 	const [postContent, setPostContent] = useState("");
 	const { user, logout } = useAuth();
@@ -47,6 +54,9 @@ export default function HomePage() {
 		null,
 	);
 	const [isLoggingOut, setIsLoggingOut] = useState(false);
+	const [currentPage, setCurrentPage] = useState(1);
+	const [totalPosts, setTotalPosts] = useState(0);
+	const postsPerPage = 10;
 
 	const router = useRouter();
 	const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -59,56 +69,73 @@ export default function HomePage() {
 		}
 	}, [user, router]);
 
-	const fetchPosts = async () => {
-		if (!user || !user.username || !backendUrl) {
-			setIsLoadingPosts(false);
-			return;
-		}
-		setIsLoadingPosts(true);
-		setErrorLoadingPosts(null);
-		try {
-			const response = await fetch(`${backendUrl}/posts/`, {
-				method: "GET",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				credentials: "include",
-			});
+	const handleLogout = useCallback(async () => {
+		setIsLoggingOut(true);
+		await logout();
+	}, [logout]);
 
-			if (!response.ok) {
-				if (response.status === 401 || response.status === 403) {
-					console.error("Auth error fetching posts. logging out.");
-					await handleLogout();
-					return;
-				}
-				const responseData = await response.json().catch(() => ({}));
-				throw new Error(
-					responseData.detail || `Error ${response.status}`,
-				);
+	const fetchPosts = useCallback(
+		async (page: number) => {
+			if (!user?.username || !backendUrl) {
+				setIsLoadingPosts(false);
+				return;
 			}
+			setIsLoadingPosts(true);
+			setErrorLoadingPosts(null);
+			try {
+				const offset = (page - 1) * postsPerPage;
+				const response = await fetch(
+					`${backendUrl}/posts/?limit=${postsPerPage}&offset=${offset}`,
+					{
+						method: "GET",
+						headers: {
+							"Content-Type": "application/json",
+						},
+						credentials: "include",
+					},
+				);
 
-			const postData: FetchedPost[] = await response.json();
-			setPosts(postData);
-		} catch (error: unknown) {
-			console.error("failed to fetch posts: ", error);
-			const message =
-				error instanceof Error ? error.message : "could not load posts";
-			setErrorLoadingPosts(message);
-		} finally {
-			setIsLoadingPosts(false);
-		}
-	};
+				if (!response.ok) {
+					if (response.status === 401 || response.status === 403) {
+						console.error(
+							"Auth error fetching posts. logging out.",
+						);
+						await handleLogout();
+						return;
+					}
+					const responseData = await response
+						.json()
+						.catch(() => ({}));
+					throw new Error(
+						responseData.detail || `Error ${response.status}`,
+					);
+				}
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
+				const data: PaginatedResponse = await response.json();
+				setPosts(data.items);
+				setTotalPosts(data.total);
+			} catch (error: unknown) {
+				console.error("failed to fetch posts: ", error);
+				const message =
+					error instanceof Error
+						? error.message
+						: "could not load posts";
+				setErrorLoadingPosts(message);
+			} finally {
+				setIsLoadingPosts(false);
+			}
+		},
+		[user, backendUrl, handleLogout],
+	);
+
 	useEffect(() => {
-		// biome-ignore lint/complexity/useOptionalChain: <explanation>
-		if (user && user.username) {
-			fetchPosts();
+		if (user?.username) {
+			fetchPosts(currentPage);
 		} else {
 			setPosts([]);
 			setIsLoadingPosts(false);
 		}
-	}, [user]);
+	}, [user, currentPage, fetchPosts]);
 
 	const handlePostSubmit = async (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
@@ -158,7 +185,7 @@ export default function HomePage() {
 			});
 			setPostContent("");
 			console.log("new post created:", responseData);
-			fetchPosts();
+			fetchPosts(currentPage);
 			console.log("fetched new posts...");
 		} catch (error: unknown) {
 			console.log("failed to create post: ", error);
@@ -177,11 +204,6 @@ export default function HomePage() {
 		}
 	};
 
-	const handleLogout = async () => {
-		setIsLoggingOut(true);
-		await logout();
-	};
-
 	const formatDate = (dateString: string) => {
 		try {
 			return new Date(dateString).toLocaleString(undefined, {
@@ -197,6 +219,8 @@ export default function HomePage() {
 	const getInitials = (name: string | null | undefined): string => {
 		return name?.charAt(0).toUpperCase() || "?";
 	};
+
+	const totalPages = Math.ceil(totalPosts / postsPerPage);
 
 	if (user && !user.username) {
 		return (
@@ -261,16 +285,48 @@ export default function HomePage() {
 						</p>
 					)}
 
-					{!isLoadingPosts &&
-						!errorLodingPosts &&
-						posts.map(post => (
-							<PostItem
-								key={post.id}
-								post={post}
-								getInitials={getInitials}
-								formatDate={formatDate}
-							/>
-						))}
+					{!isLoadingPosts && !errorLodingPosts && (
+						<>
+							{posts.map(post => (
+								<PostItem
+									key={post.id}
+									post={post}
+									getInitials={getInitials}
+									formatDate={formatDate}
+								/>
+							))}
+
+							{totalPages > 1 && (
+								<div className="flex justify-center gap-2 mt-4">
+									<Button
+										variant="outline"
+										onClick={() =>
+											setCurrentPage(p =>
+												Math.max(1, p - 1),
+											)
+										}
+										disabled={currentPage === 1}
+									>
+										Previous
+									</Button>
+									<span className="flex items-center px-4">
+										Page {currentPage} of {totalPages}
+									</span>
+									<Button
+										variant="outline"
+										onClick={() =>
+											setCurrentPage(p =>
+												Math.min(totalPages, p + 1),
+											)
+										}
+										disabled={currentPage === totalPages}
+									>
+										Next
+									</Button>
+								</div>
+							)}
+						</>
+					)}
 				</div>
 			</PageLayout>
 		</ProtectedRoute>
