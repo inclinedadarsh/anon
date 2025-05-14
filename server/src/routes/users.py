@@ -14,6 +14,10 @@ class SetUsernameRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=20, pattern=r"^[a-zA-Z0-9_]+$")
 
 
+class SetBioRequest(BaseModel):
+    bio: str = Field(..., max_length=140)
+
+
 @router.get("/", response_model=List[UserPublic], status_code=status.HTTP_200_OK)
 def get_users():
     """
@@ -24,7 +28,9 @@ def get_users():
         return users
 
 
-@router.get("/user/{username}", response_model=UserPublic, status_code=status.HTTP_200_OK)
+@router.get(
+    "/user/{username}", response_model=UserPublic, status_code=status.HTTP_200_OK
+)
 def get_user(username: str):
     """
     Get a user by their username
@@ -74,6 +80,25 @@ def set_my_username(
     session.close()
 
     print(f"Username {current_user.username} set for user {current_user.id}")
+    return current_user
+
+
+@router.patch("/me/bio", response_model=UserPublic, status_code=status.HTTP_200_OK)
+def set_my_bio(
+    bio_data: SetBioRequest,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(lambda: Session(engine)),
+):
+    """
+    Sets the bio for the currently authenticated user.
+    """
+    current_user.bio = bio_data.bio
+    session.add(current_user)
+    session.commit()
+    session.refresh(current_user)
+    session.close()
+
+    print(f"Bio updated for user {current_user.id}")
     return current_user
 
 

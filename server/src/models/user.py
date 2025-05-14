@@ -10,6 +10,7 @@ from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
 class UserBase(SQLModel):
     # TODO: Give it constraints
     username: Optional[str] = Field(default=None, index=True, unique=True)
+    bio: Optional[str] = Field(default=None, max_length=140)
 
 
 class User(UserBase, table=True):
@@ -17,10 +18,10 @@ class User(UserBase, table=True):
     google_id: Optional[str] = Field(
         default=None, index=True, unique=True, nullable=True
     )
-    encrypted_refresh_token: Optional[str] = Field(
-        default=None, sa_column=Column(Text)
-    )
-    is_wait_listed: bool = Field(default=False) # true for users who have joined wait list
+    encrypted_refresh_token: Optional[str] = Field(default=None, sa_column=Column(Text))
+    is_wait_listed: bool = Field(
+        default=False
+    )  # true for users who have joined wait list
     verification_token: Optional[str] = Field(nullable=True)
     verification_token_expires: Optional[datetime] = Field(nullable=True)
     tags: Optional[List[str]] = Field(

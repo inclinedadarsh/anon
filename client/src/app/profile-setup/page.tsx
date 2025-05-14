@@ -2,6 +2,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Toaster } from "@/components/ui/toaster";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -10,6 +11,7 @@ import { type FormEvent, useEffect, useState } from "react";
 
 export default function ProfileSetupPage() {
 	const [username, setUsername] = useState("");
+	const [bio, setBio] = useState("");
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const router = useRouter();
@@ -50,28 +52,42 @@ export default function ProfileSetupPage() {
 		}
 
 		try {
-			const response = await fetch(`${backendUrl}/users/me/username`, {
-				method: "PATCH",
-				headers: {
-					"Content-Type": "application/json",
+			const usernameResponse = await fetch(
+				`${backendUrl}/users/me/username`,
+				{
+					method: "PATCH",
+					headers: {
+						"Content-Type": "application/json",
+					},
+					credentials: "include",
+					body: JSON.stringify({ username: username }),
 				},
-				credentials: "include",
-				body: JSON.stringify({ username: username }),
-			});
+			);
 
-			const responseData = await response.json();
-
-			if (!response.ok) {
+			if (!usernameResponse.ok) {
+				const responseData = await usernameResponse.json();
 				const errorMessage =
 					responseData.detail ||
-					`Error ${response.status}: ${response.statusText}`;
+					`Error ${usernameResponse.status}: ${usernameResponse.statusText}`;
 				throw new Error(errorMessage);
 			}
 
-			console.log("Username set successfully: ", responseData);
-			await refetchUser();
-			console.log("auth context refreshed.");
+			if (bio.trim()) {
+				const bioResponse = await fetch(`${backendUrl}/users/me/bio`, {
+					method: "PATCH",
+					headers: {
+						"Content-Type": "application/json",
+					},
+					credentials: "include",
+					body: JSON.stringify({ bio: bio.trim() }),
+				});
 
+				if (!bioResponse.ok) {
+					throw new Error("Failed to set bio");
+				}
+			}
+
+			await refetchUser();
 			toast({
 				title: "Success!",
 				description: "Your Anon profile is ready.",
@@ -79,11 +95,11 @@ export default function ProfileSetupPage() {
 
 			router.push("/home");
 		} catch (err: unknown) {
-			console.log("Failed to set username: ", err);
+			console.log("Failed to set profile: ", err);
 			const message =
 				err instanceof Error
 					? err.message
-					: "An unknown error occured.";
+					: "An unknown error occurred.";
 			setError(message);
 			toast({
 				variant: "destructive",
@@ -112,8 +128,8 @@ export default function ProfileSetupPage() {
 						Set Up Your Anonymous Profile
 					</h1>
 					<p className="mt-2 text-muted-foreground">
-						Choose your unique username (3-20 characters, letters,
-						numbers and underscore only).
+						Choose your unique username and add a bio to get
+						started.
 					</p>
 				</div>
 				<form onSubmit={handleSubmit} className="space-y-4">
@@ -136,6 +152,21 @@ export default function ProfileSetupPage() {
 							Only letters numbers and underscores allowed.
 						</p>
 					</div>
+					<div>
+						<Label htmlFor="bio">Bio (Optional)</Label>
+						<Textarea
+							id="bio"
+							value={bio}
+							onChange={e => setBio(e.target.value)}
+							placeholder="Write something about yourself..."
+							maxLength={140}
+							disabled={isLoading}
+							className="mt-1 resize-none"
+						/>
+						<p className="text-xs mt-1 text-muted-foreground">
+							{140 - bio.length} characters remaining
+						</p>
+					</div>
 					{error && (
 						<p className="text-sm font-medium text-destructive">
 							{error}
@@ -146,9 +177,7 @@ export default function ProfileSetupPage() {
 						type="submit"
 						disabled={isLoading}
 					>
-						{isLoading
-							? "Saving..."
-							: "Set Username and Enter Anon"}
+						{isLoading ? "Saving..." : "Set Profile and Enter Anon"}
 					</Button>
 				</form>
 			</div>
