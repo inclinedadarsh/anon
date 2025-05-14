@@ -50,11 +50,14 @@ def get_posts(
     Get paginated posts with their authors
     """
     with Session(engine) as session:
-        total_count = session.exec(select(func.count()).select_from(Post)).first()
+        total_count = session.exec(
+            select(func.count()).select_from(Post).where(Post.deleted == False)
+        ).first()
 
         statement = (
             select(Post, User)
             .join(User, Post.author_id == User.id)
+            .where(Post.deleted == False)
             .order_by(desc(Post.created_at))
             .offset(offset)
             .limit(limit)
@@ -83,7 +86,9 @@ def get_post(post_id: int, user: User = Depends(get_current_user)):
     Get a post by its ID with its author
     """
     with Session(engine) as session:
-        post = session.exec(select(Post).where(Post.id == post_id)).first()
+        post = session.exec(
+            select(Post).where(Post.id == post_id).where(Post.deleted == False)
+        ).first()
         if post is None:
             raise HTTPException(status_code=404, detail="Post not found")
         author = session.exec(select(User).where(User.id == post.author_id)).first()
@@ -99,7 +104,7 @@ def get_post(post_id: int, user: User = Depends(get_current_user)):
 @router.delete("/{post_id}", response_model=PostPublic)
 def delete_post(post_id: int, user: User = Depends(get_current_user)):
     """
-    Delete a post by its ID
+    Soft delete a post by its ID
     """
     with Session(engine) as session:
         post = session.exec(select(Post).where(Post.id == post_id)).first()
@@ -109,8 +114,10 @@ def delete_post(post_id: int, user: User = Depends(get_current_user)):
             raise HTTPException(
                 status_code=403, detail="You are not the author of this post"
             )
-        session.delete(post)
+        post.deleted = True
+        session.add(post)
         session.commit()
+        session.refresh(post)
         author = session.exec(select(User).where(User.id == post.author_id)).first()
         post_public = PostPublic(
             **post.model_dump(),
@@ -134,14 +141,17 @@ def get_posts_by_username(
         if author is None:
             raise HTTPException(status_code=404, detail="User not found")
 
-        
         total_count = session.exec(
-            select(func.count()).select_from(Post).where(Post.author_id == author.id)
+            select(func.count())
+            .select_from(Post)
+            .where(Post.author_id == author.id)
+            .where(Post.deleted == False)
         ).first()
 
         statement = (
             select(Post)
             .where(Post.author_id == author.id)
+            .where(Post.deleted == False)
             .order_by(desc(Post.created_at))
             .offset(offset)
             .limit(limit)

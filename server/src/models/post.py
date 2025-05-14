@@ -18,6 +18,7 @@ class Post(PostBase, table=True):
         sa_column_kwargs={"server_default": sa.func.now()},
         nullable=False,
     )
+    deleted: bool = Field(default=False, nullable=False)
 
 
 class PostCreate(PostBase):

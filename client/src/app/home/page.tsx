@@ -293,6 +293,9 @@ export default function HomePage() {
 									post={post}
 									getInitials={getInitials}
 									formatDate={formatDate}
+									onPostDeleted={() =>
+										fetchPosts(currentPage)
+									}
 								/>
 							))}
 

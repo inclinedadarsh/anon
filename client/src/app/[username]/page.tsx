@@ -201,22 +201,28 @@ export default function ProfilePage() {
 								maxLength={140}
 								className="resize-none"
 							/>
-							<div className="flex justify-end space-x-2 mt-2">
-								<Button
-									variant="ghost"
-									onClick={() => setIsEditingBio(false)}
-									disabled={isSavingBio}
-								>
-									Cancel
-								</Button>
-								<Button
-									type="submit"
-									disabled={
-										isSavingBio || newBio === profile.bio
-									}
-								>
-									{isSavingBio ? "Saving..." : "Save"}
-								</Button>
+							<div className="flex justify-between items-center mt-2">
+								<p className="text-sm text-muted-foreground">
+									{140 - newBio.length} characters remaining
+								</p>
+								<div className="flex space-x-2">
+									<Button
+										variant="ghost"
+										onClick={() => setIsEditingBio(false)}
+										disabled={isSavingBio}
+									>
+										Cancel
+									</Button>
+									<Button
+										type="submit"
+										disabled={
+											isSavingBio ||
+											newBio === profile.bio
+										}
+									>
+										{isSavingBio ? "Saving..." : "Save"}
+									</Button>
+								</div>
 							</div>
 						</form>
 					)}
@@ -256,6 +262,40 @@ export default function ProfilePage() {
 											},
 										)
 									}
+									onPostDeleted={() => {
+										const fetchUserPosts = async () => {
+											setLoadingPosts(true);
+											setErrorPosts(null);
+											try {
+												const offset =
+													(currentPage - 1) *
+													postsPerPage;
+												const res = await fetch(
+													`${backendUrl}/posts/user/${username}?limit=${postsPerPage}&offset=${offset}`,
+													{
+														credentials: "include",
+													},
+												);
+												if (!res.ok) {
+													throw new Error(
+														"Could not fetch user's posts",
+													);
+												}
+												const data = await res.json();
+												setPosts(data.items);
+												setTotalPosts(data.total);
+											} catch (err: unknown) {
+												setErrorPosts(
+													err instanceof Error
+														? err.message
+														: "Failed to load posts",
+												);
+											} finally {
+												setLoadingPosts(false);
+											}
+										};
+										fetchUserPosts();
+									}}
 								/>
 							))}
 						</div>

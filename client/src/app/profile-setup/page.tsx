@@ -142,14 +142,15 @@ export default function ProfileSetupPage() {
 							onChange={e => setUsername(e.target.value)}
 							placeholder="e.g anon_kkw"
 							required
-							minLength={3}
-							maxLength={20}
+							minLength={4}
+							maxLength={15}
 							pattern="^[a-zA-Z0-9_]+$"
 							disabled={isLoading}
 							className="mt-1"
 						/>
 						<p className="text-xs mt-1 text-muted-foreground">
-							Only letters numbers and underscores allowed.
+							4-15 characters, only letters, numbers and
+							underscores allowed.
 						</p>
 					</div>
 					<div>
