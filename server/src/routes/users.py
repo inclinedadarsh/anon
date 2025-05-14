@@ -24,16 +24,16 @@ def get_users():
         return users
 
 
-# @router.get("/{username}", response_model=UserPublic, status_code=status.HTTP_200_OK)
-# def get_user(username: str):
-#     """
-#     Get a user by their username
-#     """
-#     with Session(engine) as session:
-#         user = session.exec(select(User).where(User.username == username)).first()
-#         if user is None:
-#             raise HTTPException(status_code=404, detail="User not found")
-#         return user
+@router.get("/user/{username}", response_model=UserPublic, status_code=status.HTTP_200_OK)
+def get_user(username: str):
+    """
+    Get a user by their username
+    """
+    with Session(engine) as session:
+        user = session.exec(select(User).where(User.username == username)).first()
+        if user is None:
+            raise HTTPException(status_code=404, detail="User not found")
+        return user
 
 
 @router.patch("/me/username", response_model=UserPublic, status_code=status.HTTP_200_OK)

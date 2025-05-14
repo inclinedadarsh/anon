@@ -35,14 +35,18 @@ def get_posts(user: User = Depends(get_current_user)):
     Get all posts with their authors
     """
     with Session(engine) as session:
-        statement = select(Post, User).join(User, Post.author_id == User.id).order_by(desc(Post.created_at))
+        statement = (
+            select(Post, User)
+            .join(User, Post.author_id == User.id)
+            .order_by(desc(Post.created_at))
+        )
         results = session.exec(statement).all()
         posts_public = [
             PostPublic(
                 id=post.id,
                 content=post.content,
                 created_at=post.created_at,
-                author=Author(author_id=user.id, username=user.username)
+                author=Author(author_id=user.id, username=user.username),
             )
             for post, user in results
         ]
@@ -69,7 +73,7 @@ def get_post(post_id: int, user: User = Depends(get_current_user)):
 
 
 @router.delete("/{post_id}", response_model=PostPublic)
-def delete_post(post_id: int, user: User = Depends(get_current_user) ):
+def delete_post(post_id: int, user: User = Depends(get_current_user)):
     """
     Delete a post by its ID
     """
@@ -78,7 +82,9 @@ def delete_post(post_id: int, user: User = Depends(get_current_user) ):
         if post is None:
             raise HTTPException(status_code=404, detail="Post not found")
         if post.author_id != user.id:
-            raise HTTPException(status_code=403, detail="You are not the author of this post")
+            raise HTTPException(
+                status_code=403, detail="You are not the author of this post"
+            )
         session.delete(post)
         session.commit()
         author = session.exec(select(User).where(User.id == post.author_id)).first()
@@ -87,3 +93,30 @@ def delete_post(post_id: int, user: User = Depends(get_current_user) ):
             author=Author(author_id=author.id, username=author.username)
         )
         return post_public
+
+
+@router.get("/user/{username}", response_model=List[PostPublic])
+def get_posts_by_username(username: str, user: User = Depends(get_current_user)):
+    """
+    Get all posts by a specific username
+    """
+    with Session(engine) as session:
+        author = session.exec(select(User).where(User.username == username)).first()
+        if author is None:
+            raise HTTPException(status_code=404, detail="User not found")
+        statement = (
+            select(Post)
+            .where(Post.author_id == author.id)
+            .order_by(desc(Post.created_at))
+        )
+        posts = session.exec(statement).all()
+        posts_public = [
+            PostPublic(
+                id=post.id,
+                content=post.content,
+                created_at=post.created_at,
+                author=Author(author_id=author.id, username=author.username),
+            )
+            for post in posts
+        ]
+        return posts_public

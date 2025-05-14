@@ -14,8 +14,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { UserRound } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useState } from "react";
+import PostItem, { type FetchedPost } from "./PostItem";
+
 interface UserProfile {
 	id: number;
 	username: string | null;
@@ -30,13 +33,6 @@ interface NewPost {
 interface PostAuthor {
 	author_id: string;
 	username: string;
-}
-
-interface FetchedPost {
-	id: number;
-	content: string;
-	created_at: string;
-	author: PostAuthor;
 }
 
 export default function HomePage() {
@@ -211,19 +207,46 @@ export default function HomePage() {
 
 	return (
 		<ProtectedRoute>
-			<main className="flex min-h-screen flex-col p-6 pt-12 md:p-24 items-center">
-				<div className="w-full max-w- space-y-8">
+			<main className="flex min-h-screen flex-col p-6 pt-8 md:p-24 items-center">
+				<div className="w-full max-w-4xl space-y-8">
+					<div className="flex justify-between items-center">
+						<div className="flex items-center space-x-4">
+							{user?.username && (
+								<Link href={`/${user.username}`}>
+									<Button
+										variant="ghost"
+										className="flex items-center space-x-2 p-2"
+									>
+										<Avatar className="h-8 w-8">
+											<AvatarFallback>
+												{getInitials(user.username)}
+											</AvatarFallback>
+										</Avatar>
+										<span className="font-medium">
+											{user.username}
+										</span>
+									</Button>
+								</Link>
+							)}
+						</div>
+						<div className="flex items-center space-x-4">
+							<Button
+								variant="ghost"
+								onClick={handleLogout}
+								disabled={isLoggingOut}
+								className="flex items-center space-x-2 p-2"
+							>
+								<UserRound className="h-5 w-5" />
+								<span className="font-medium">
+									{isLoggingOut ? "Logging out.." : "Logout"}
+								</span>
+							</Button>
+						</div>
+					</div>
+
 					<h1 className="text-3xl font-bold">
 						Supp, {user?.username}. Been a minute.
 					</h1>
-
-					<Button
-						variant="outline"
-						onClick={handleLogout}
-						disabled={isLoggingOut}
-					>
-						{isLoggingOut ? "Logging out.." : "Logout"}
-					</Button>
 
 					<form onSubmit={handlePostSubmit} className="space-y-3">
 						<Textarea
@@ -264,59 +287,12 @@ export default function HomePage() {
 						{!isLoadingPosts &&
 							!errorLodingPosts &&
 							posts.map(post => (
-								// <Card key={post.id} className="rounded-none shadow-none border-none border-gray-200">
-								//     <CardHeader className="flex flex-row items-center space-x-3 pb-2">
-								//         <Avatar>
-								//             <AvatarFallback>
-								//             {getInitials(post.author.username)}
-								//             </AvatarFallback>
-								//         </Avatar>
-								//         <div className="flex flex-col">
-								//             <CardTitle className="text-sm font-medium">
-								//                 {post.author.username}
-								//             </CardTitle>
-								//             <p className="text-xs text-muted-foreground">
-								//                 {formatDate(post.created_at)}
-								//             </p>
-								//         </div>
-								//     </CardHeader>
-								//     <CardContent>
-								//         <p className="whitespace-pre-wrap">{post.content}</p>
-								//     </CardContent>
-								// </Card>
-								<Card
+								<PostItem
 									key={post.id}
-									className="border-none rounded-none shadow-none border-b border-gray-200 pb-4"
-								>
-									<CardHeader className="p-0 pb-2">
-										<div className="flex space-x-3">
-											<Avatar className="h-10 w-10 mt-1">
-												<AvatarFallback>
-													{getInitials(
-														post.author.username,
-													)}
-												</AvatarFallback>
-											</Avatar>
-											<div className="flex flex-col flex-1">
-												<div className="flex items-center justify-between">
-													<CardTitle className="text-sm font-medium">
-														{post.author.username}
-													</CardTitle>
-													<p className="text-xs text-muted-foreground">
-														{formatDate(
-															post.created_at,
-														)}
-													</p>
-												</div>
-												<CardContent className="p-0 pt-1">
-													<p className="text-sm whitespace-pre-wrap">
-														{post.content}
-													</p>
-												</CardContent>
-											</div>
-										</div>
-									</CardHeader>
-								</Card>
+									post={post}
+									getInitials={getInitials}
+									formatDate={formatDate}
+								/>
 							))}
 					</div>
 				</div>
