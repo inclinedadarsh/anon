@@ -1,5 +1,6 @@
 "use client";
 
+import { PageLayout } from "@/components/layouts/PageLayout";
 import { ProtectedRoute } from "@/components/ui/ProtectedRoute";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -207,96 +208,60 @@ export default function HomePage() {
 
 	return (
 		<ProtectedRoute>
-			<main className="flex min-h-screen flex-col p-6 pt-8 md:p-24 items-center">
-				<div className="w-full max-w-4xl space-y-8">
-					<div className="flex justify-between items-center">
-						<div className="flex items-center space-x-4">
-							{user?.username && (
-								<Link href={`/${user.username}`}>
-									<Button
-										variant="ghost"
-										className="flex items-center space-x-2 p-2"
-									>
-										<Avatar className="h-8 w-8">
-											<AvatarFallback>
-												{getInitials(user.username)}
-											</AvatarFallback>
-										</Avatar>
-										<span className="font-medium">
-											{user.username}
-										</span>
-									</Button>
-								</Link>
-							)}
-						</div>
-						<div className="flex items-center space-x-4">
-							<Button
-								variant="ghost"
-								onClick={handleLogout}
-								disabled={isLoggingOut}
-								className="flex items-center space-x-2 p-2"
-							>
-								<UserRound className="h-5 w-5" />
-								<span className="font-medium">
-									{isLoggingOut ? "Logging out.." : "Logout"}
-								</span>
-							</Button>
-						</div>
+			<PageLayout
+				username={user?.username}
+				onLogout={handleLogout}
+				isLoggingOut={isLoggingOut}
+				getInitials={getInitials}
+			>
+				<h1 className="text-3xl font-bold">
+					Supp, {user?.username}. Been a minute.
+				</h1>
+
+				<form onSubmit={handlePostSubmit} className="space-y-3">
+					<Textarea
+						placeholder="What's on your mind? Share anonymously..."
+						value={postContent}
+						onChange={event => setPostContent(event.target.value)}
+						required
+						rows={4}
+						disabled={isPosting}
+						className="resize-none focus-visible:ring-0"
+					/>
+					{errorPost && (
+						<p className="text-sm text-destructive">{errorPost}</p>
+					)}
+					<div className="flex justify-end">
+						<Button
+							type="submit"
+							disabled={isPosting || !postContent.trim()}
+						>
+							{isPosting ? "Posting..." : "Post Anonymously"}
+						</Button>
 					</div>
+				</form>
 
-					<h1 className="text-3xl font-bold">
-						Supp, {user?.username}. Been a minute.
-					</h1>
+				<div className="pt-8 space-y-4">
+					{isLoadingPosts && <p>Loading posts...</p>}
 
-					<form onSubmit={handlePostSubmit} className="space-y-3">
-						<Textarea
-							placeholder="What's on your mind? Share anonymously..."
-							value={postContent}
-							onChange={event =>
-								setPostContent(event.target.value)
-							}
-							required
-							rows={4}
-							disabled={isPosting}
-							className="resize-none focus-visible:ring-0"
-						/>
-						{errorPost && (
-							<p className="text-sm text-destructive">
-								{errorPost}
-							</p>
-						)}
-						<div className="flex justify-end">
-							<Button
-								type="submit"
-								disabled={isPosting || !postContent.trim()}
-							>
-								{isPosting ? "Posting..." : "Post Anonymously"}
-							</Button>
-						</div>
-					</form>
+					{errorLodingPosts && (
+						<p className="text-destructive">
+							Error loading posts: {errorLodingPosts}
+						</p>
+					)}
 
-					<div className="pt-8 space-y-4">
-						{isLoadingPosts && <p>Loading posts...</p>}
-
-						{errorLodingPosts && (
-							<p className="text-destructive">
-								Error loading posts: {errorLodingPosts}
-							</p>
-						)}
-
-						{!isLoadingPosts &&
-							!errorLodingPosts &&
-							posts.map(post => (
-								<PostItem
-									key={post.id}
-									post={post}
-									getInitials={getInitials}
-									formatDate={formatDate}
-								/>
-							))}
-					</div>
+					{!isLoadingPosts &&
+						!errorLodingPosts &&
+						posts.map(post => (
+							<PostItem
+								key={post.id}
+								post={post}
+								getInitials={getInitials}
+								formatDate={formatDate}
+							/>
+						))}
 				</div>
-			</main>
+			</PageLayout>
 		</ProtectedRoute>
 	);
 }

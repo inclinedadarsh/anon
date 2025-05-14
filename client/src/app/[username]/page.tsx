@@ -1,5 +1,6 @@
 "use client";
 
+import { PageLayout } from "@/components/layouts/PageLayout";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -107,64 +108,47 @@ export default function ProfilePage() {
 	if (!profile) return null;
 
 	return (
-		<main className="flex min-h-screen flex-col p-6 pt-8 md:p-24 items-center">
-			<div className="w-full max-w-4xl space-y-8">
-				<div className="flex justify-between items-center">
-					<Button
-						variant="ghost"
-						className="flex items-center space-x-2 p-2"
-						onClick={() => router.push("/home")}
-					>
-						<ArrowLeft className="h-4 w-4" />
-						<span>Back to Home</span>
-					</Button>
+		<PageLayout showBackButton getInitials={getInitials}>
+			<Card className="w-full flex flex-row items-center border-none shadow-none">
+				<Avatar className="h-20 w-20 m-2">
+					<AvatarFallback>
+						{getInitials(profile.username)}
+					</AvatarFallback>
+				</Avatar>
+				<CardContent className="flex flex-col items-center">
+					<h2 className="text-2xl font-bold">@{profile.username}</h2>
+				</CardContent>
+			</Card>
+
+			<section className="w-full">
+				{loadingPosts && (
+					<p className="text-center">Loading posts...</p>
+				)}
+				{errorPosts && (
+					<p className="text-center text-destructive">{errorPosts}</p>
+				)}
+				{!loadingPosts && !errorPosts && posts.length === 0 && (
+					<p className="text-center text-muted-foreground">
+						No posts yet.
+					</p>
+				)}
+				<div className="space-y-4">
+					{posts.map(post => (
+						<PostItem
+							key={post.id}
+							post={post}
+							getInitials={getInitials}
+							formatDate={date =>
+								new Date(date).toLocaleString(undefined, {
+									dateStyle: "medium",
+									timeStyle: "short",
+									hour12: true,
+								})
+							}
+						/>
+					))}
 				</div>
-
-				<Card className="w-full flex flex-row items-center border-none shadow-none">
-					<Avatar className="h-20 w-20 m-2">
-						<AvatarFallback>
-							{getInitials(profile.username)}
-						</AvatarFallback>
-					</Avatar>
-					<CardContent className="flex flex-col items-center">
-						<h2 className="text-2xl font-bold">
-							@{profile.username}
-						</h2>
-					</CardContent>
-				</Card>
-
-				<section className="w-full">
-					{loadingPosts && (
-						<p className="text-center">Loading posts...</p>
-					)}
-					{errorPosts && (
-						<p className="text-center text-destructive">
-							{errorPosts}
-						</p>
-					)}
-					{!loadingPosts && !errorPosts && posts.length === 0 && (
-						<p className="text-center text-muted-foreground">
-							No posts yet.
-						</p>
-					)}
-					<div className="space-y-4">
-						{posts.map(post => (
-							<PostItem
-								key={post.id}
-								post={post}
-								getInitials={getInitials}
-								formatDate={date =>
-									new Date(date).toLocaleString(undefined, {
-										dateStyle: "medium",
-										timeStyle: "short",
-										hour12: true,
-									})
-								}
-							/>
-						))}
-					</div>
-				</section>
-			</div>
-		</main>
+			</section>
+		</PageLayout>
 	);
 }
