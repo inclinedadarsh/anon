@@ -222,16 +222,24 @@ export default function HomePage() {
 					<Textarea
 						placeholder="What's on your mind? Share anonymously..."
 						value={postContent}
-						onChange={event => setPostContent(event.target.value)}
+						onChange={event =>
+							setPostContent(event.target.value.slice(0, 420))
+						}
 						required
 						rows={4}
 						disabled={isPosting}
 						className="resize-none focus-visible:ring-0"
+						maxLength={420}
 					/>
-					{errorPost && (
-						<p className="text-sm text-destructive">{errorPost}</p>
-					)}
-					<div className="flex justify-end">
+					<div className="flex items-center">
+						<div className="flex-1">
+							{postContent.length > 0 && (
+								<p className="text-sm text-muted-foreground">
+									{420 - postContent.length} characters
+									remaining
+								</p>
+							)}
+						</div>
 						<Button
 							type="submit"
 							disabled={isPosting || !postContent.trim()}
@@ -239,6 +247,9 @@ export default function HomePage() {
 							{isPosting ? "Posting..." : "Post Anonymously"}
 						</Button>
 					</div>
+					{errorPost && (
+						<p className="text-sm text-destructive">{errorPost}</p>
+					)}
 				</form>
 
 				<div className="pt-8 space-y-4">
