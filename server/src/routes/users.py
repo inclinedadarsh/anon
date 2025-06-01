@@ -77,6 +77,17 @@ def set_my_username(
     session.add(current_user)
     session.commit()
     session.refresh(current_user)
+
+    if not current_user.referral_code:
+        from src.services.referral import create_referral_code_for_user
+
+        referral_code = create_referral_code_for_user(session, current_user.id)
+        if referral_code:
+            print(
+                f"Referral code {referral_code.code} generated for user {current_user.id}"
+            )
+            session.refresh(current_user)
+
     session.close()
 
     print(f"Username {current_user.username} set for user {current_user.id}")

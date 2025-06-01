@@ -1,5 +1,6 @@
 "use client";
 
+import ReferralCard from "@/components/ReferralCard";
 import { PageLayout } from "@/components/layouts/PageLayout";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -228,6 +229,12 @@ export default function ProfilePage() {
 					)}
 				</CardContent>
 			</Card>
+
+			{currentUser?.username === profile.username && (
+				<div className="mb-6">
+					<ReferralCard />
+				</div>
+			)}
 
 			<section className="w-full">
 				{loadingPosts && (

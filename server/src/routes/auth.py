@@ -71,7 +71,9 @@ async def google_login():
 
 
 @router.get("/google/callback", tags=["auth"], include_in_schema=False)
-async def google_callback(request: Request, code: str = None, error: str = None):
+async def google_callback(
+    request: Request, code: str = None, error: str = None, state: str = None
+):
     """
     Handles the callback from google after user authentication.
     Exchanges the authorization code for access token, validates user,
@@ -87,6 +89,12 @@ async def google_callback(request: Request, code: str = None, error: str = None)
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Missing authorization code from Google",
         )
+
+    referral_code = None
+    if state and state.startswith("referral_"):
+        referral_code = state.replace("referral_", "")
+        print(f"Referral signup detected with code: {referral_code}")
+
     token_url = "https://oauth2.googleapis.com/token"
     token_data = {
         "code": code,
@@ -158,43 +166,72 @@ async def google_callback(request: Request, code: str = None, error: str = None)
             detail="Access restricted to @kkwagh.edu.in emails only.",
         )
 
-    # waitlist check
-    hashed_google_id = hash_identifier(google_id)
-    print(f"Checking waitlist for hashed_google_id: {hashed_google_id}")
-    try:
-        waitlist_query = (
-            supabase.table("waitlist_users")
-            .select("hashed_google_id")
-            .eq("hashed_google_id", hashed_google_id)
-            .execute()
-        )
-
-        if not waitlist_query.data:
-            print(f"User {hashed_google_id} not found in waitlist.")
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You are not on the waitlist. Please ask your friend for a referral.",
-            )
-        print(f"User {hashed_google_id} found in waitlist. Proceeding.")
-    except Exception as e:
-        print(f"Error checking Supabase waitlist: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Could not verify waitlist status at the moment. Please try again later.",
-        )
-
     user = None
     with Session(engine) as session:
         user = session.exec(select(User).where(User.google_id == google_id)).first()
 
-        if user:
+    if user:
+        with Session(engine) as session:
             if refresh_token:
                 user.encrypted_refresh_token = encrypt_refresh_token(refresh_token)
                 session.add(user)
                 session.commit()
                 session.refresh(user)
             print(f"Existing user logged in: {user.id}")
-        else:
+    else:
+        allowed_to_signup = False
+        signup_source = None
+        referrer_id = None
+
+        try:
+            hashed_google_id = hash_identifier(google_id)
+            waitlist_query = (
+                supabase.table("waitlist_users")
+                .select("hashed_google_id")
+                .eq("hashed_google_id", hashed_google_id)
+                .execute()
+            )
+
+            if waitlist_query.data:
+                allowed_to_signup = True
+                signup_source = "waitlist"
+                print(
+                    f"User {hashed_google_id} found in Supabase waitlist access allowed."
+                )
+        except Exception as e:
+            print(f"Error checking Supabase waitlist: {e}")
+
+        if not allowed_to_signup:
+            if referral_code:
+                with Session(engine) as session:
+                    from src.services.referral import validate_referral_code
+
+                    is_valid, referral_code_obj, referrer = validate_referral_code(
+                        session, referral_code
+                    )
+
+                    if is_valid and referrer:
+                        allowed_to_signup = True
+                        signup_source = "referral"
+                        referrer_id = referrer.id
+                        print(
+                            f"User {hashed_google_id} authorized via valid referral code {referral_code}"
+                        )
+                    else:
+                        print(f"Invalid referral code {referral_code} provided")
+            else:
+                print(
+                    f"User {hashed_google_id} not on waitlist and no referral code provided."
+                )
+
+        if not allowed_to_signup:
+            print(f"User {hashed_google_id} not authorized for access.")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only waitlisted users or referred users can access Anon. Please ask your friend for a referral.",
+            )
+
+        with Session(engine) as session:
             encrypted_rt = (
                 encrypt_refresh_token(refresh_token) if refresh_token else None
             )
@@ -202,14 +239,23 @@ async def google_callback(request: Request, code: str = None, error: str = None)
             new_user = User(
                 google_id=google_id,
                 encrypted_refresh_token=encrypted_rt,
-                is_wait_listed=True,
                 username=None,
+                referred_by=referrer_id,
             )
             session.add(new_user)
             session.commit()
             session.refresh(new_user)
             user = new_user
             print(f"New user created: {user.id}")
+
+            if referrer_id and signup_source == "referral":
+                from src.services.referral import complete_referral_simple
+
+                success = complete_referral_simple(
+                    session, referrer_id, user.id, referral_code
+                )
+                if success:
+                    print(f"Referral completed: {referrer_id} -> {user.id}")
 
     if not user or user.id is None:
         raise HTTPException(
@@ -231,19 +277,6 @@ async def google_callback(request: Request, code: str = None, error: str = None)
         redirect_url = f"{frontend_redirect_base}/home"
 
     response = RedirectResponse(url=redirect_url)
-    # html_content = f"""
-    #     <html>
-    #         <head><title>Login Success</title></head>
-    #         <body>
-    #             <h1>Login successful!</h1>
-    #             <p>Cookie should be set. Check DevTools.</p>
-    #             <p>Token: {platform_token[:10]}...</p>
-    #             <a href="{frontend_redirect_base}/profile-setup">Go to Profile Setup</a> <br/>
-    #             <a href="{frontend_redirect_base}/home">Go to Home</a>
-    #         </body>
-    #     </html>
-    # """
-    # response = HTMLResponse(content=html_content)
     response.set_cookie(
         key="access_token",
         value=platform_token,
@@ -254,7 +287,6 @@ async def google_callback(request: Request, code: str = None, error: str = None)
         path="/",
     )
     print(f"jwt cookie set (domain removed). redirecting to {redirect_url}")
-    # print(f"JWT cookie set for domain 'localhost'. Redirecting to {redirect_url}")
     return response
 
 
