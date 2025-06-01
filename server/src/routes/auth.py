@@ -16,6 +16,10 @@ from src.services.auth import encrypt_refresh_token
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 
+import hmac
+import hashlib
+from supabase import create_client, Client
+
 load_dotenv(find_dotenv())
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
@@ -23,12 +27,29 @@ GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI")
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+IDENTIFIER_HASH_SECRET = os.getenv("IDENTIFIER_HASH_SECRET")
+
 if not all(
-        [GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, JWT_SECRET_KEY]
-        ):
+    [GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, JWT_SECRET_KEY]
+):
     raise ValueError("Missing required Google OAuth or JWT environment variables.")
 
+if not all([SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, IDENTIFIER_HASH_SECRET]):
+    raise ValueError(
+        "Missing Supabase or Identifier Hash environment variables for waitlist check."
+    )
+
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 router = APIRouter()
+
+
+def hash_identifier(id_str: str) -> str:
+    secret_bytes = IDENTIFIER_HASH_SECRET.encode("utf-8")
+    id_bytes = id_str.encode("utf-8")
+    hashed_object = hmac.new(secret_bytes, id_bytes, hashlib.sha256)
+    return hashed_object.hexdigest()
 
 
 @router.get("/google/login", tags=["auth"], include_in_schema=False)
@@ -38,14 +59,14 @@ async def google_login():
     """
     scope = "email"
     auth_url = (
-            f"https://accounts.google.com/o/oauth2/v2/auth?"
-            f"response_type=code&"
-            f"client_id={GOOGLE_CLIENT_ID}&"
-            f"redirect_uri={GOOGLE_REDIRECT_URI}&"
-            f"scope={scope}&"
-            f"access_type=offline&"
-            f"prompt=consent"
-            )
+        f"https://accounts.google.com/o/oauth2/v2/auth?"
+        f"response_type=code&"
+        f"client_id={GOOGLE_CLIENT_ID}&"
+        f"redirect_uri={GOOGLE_REDIRECT_URI}&"
+        f"scope={scope}&"
+        f"access_type=offline&"
+        f"prompt=consent"
+    )
     return RedirectResponse(url=auth_url)
 
 
@@ -58,22 +79,22 @@ async def google_callback(request: Request, code: str = None, error: str = None)
     """
     if error:
         raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"Google login error: {error}",
-                )
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Google login error: {error}",
+        )
     if not code:
         raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Missing authorization code from Google",
-                )
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing authorization code from Google",
+        )
     token_url = "https://oauth2.googleapis.com/token"
     token_data = {
-            "code": code,
-            "client_id": GOOGLE_CLIENT_ID,
-            "client_secret": GOOGLE_CLIENT_SECRET,
-            "redirect_uri": GOOGLE_REDIRECT_URI,
-            "grant_type": "authorization_code",
-            }
+        "code": code,
+        "client_id": GOOGLE_CLIENT_ID,
+        "client_secret": GOOGLE_CLIENT_SECRET,
+        "redirect_uri": GOOGLE_REDIRECT_URI,
+        "grant_type": "authorization_code",
+    }
     async with httpx.AsyncClient() as client:
         try:
             token_response = await client.post(token_url, data=token_data)
@@ -81,18 +102,18 @@ async def google_callback(request: Request, code: str = None, error: str = None)
             token_json = token_response.json()
         except httpx.HTTPStatusError as e:
             print(
-                    f"HTTP error exchanging code: {e.response.status_code} - {e.response.text}"
-                    )
+                f"HTTP error exchanging code: {e.response.status_code} - {e.response.text}"
+            )
             raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to exchange authorization code with Google.",
-                    )
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to exchange authorization code with Google.",
+            )
         except Exception as e:
             print(f"Error exchanging code: {e}")
             raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="An error occurred during token exchange.",
-                    )
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="An error occurred during token exchange.",
+            )
 
     access_token = token_json.get("access_token")
     refresh_token = token_json.get("refresh_token")
@@ -100,14 +121,14 @@ async def google_callback(request: Request, code: str = None, error: str = None)
 
     if not id_token_jwt:
         raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Missing id_token from Google.",
-                )
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Missing id_token from Google.",
+        )
 
     try:
         id_info = id_token.verify_oauth2_token(
-                id_token_jwt, google_requests.Request(), GOOGLE_CLIENT_ID
-                )
+            id_token_jwt, google_requests.Request(), GOOGLE_CLIENT_ID
+        )
 
         google_id = id_info.get("sub")
         email = id_info.get("email")
@@ -115,35 +136,52 @@ async def google_callback(request: Request, code: str = None, error: str = None)
 
         if not all([google_id, email, email_verified]):
             raise ValueError(
-                    "ID token missing required fields (sub, email, email_verified)."
-                    )
+                "ID token missing required fields (sub, email, email_verified)."
+            )
 
     except ValueError as e:
         print(f"ID Token Verification Error: {e}")
         raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid ID token from Google.",
-                )
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid ID token from Google.",
+        )
     except Exception as e:
         print(f"Unexpected error verifying ID token: {e}")
         raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Could not verify Google ID token.",
-                )
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not verify Google ID token.",
+        )
 
     if not email.endswith("@kkwagh.edu.in"):
         raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access restricted to @kkwagh.edu.in emails only.",
+        )
+
+    # waitlist check
+    hashed_google_id = hash_identifier(google_id)
+    print(f"Checking waitlist for hashed_google_id: {hashed_google_id}")
+    try:
+        waitlist_query = (
+            supabase.table("waitlist_users")
+            .select("hashed_google_id")
+            .eq("hashed_google_id", hashed_google_id)
+            .execute()
+        )
+
+        if not waitlist_query.data:
+            print(f"User {hashed_google_id} not found in waitlist.")
+            raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access restricted to @kkwagh.edu.in emails only.",
-                )
-
-    # Placeholder for Waitlist Check ----------------------------------------------------
-    def is_user_waitlisted() -> bool:
-        return True
-
-    if not is_user_waitlisted():
-        pass
-    # -----------------------------------------------------------------------------------
+                detail="You are not on the waitlist. Please ask your friend for a referral.",
+            )
+        print(f"User {hashed_google_id} found in waitlist. Proceeding.")
+    except Exception as e:
+        print(f"Error checking Supabase waitlist: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Could not verify waitlist status at the moment. Please try again later.",
+        )
 
     user = None
     with Session(engine) as session:
@@ -158,15 +196,15 @@ async def google_callback(request: Request, code: str = None, error: str = None)
             print(f"Existing user logged in: {user.id}")
         else:
             encrypted_rt = (
-                    encrypt_refresh_token(refresh_token) if refresh_token else None
-                    )
+                encrypt_refresh_token(refresh_token) if refresh_token else None
+            )
 
             new_user = User(
-                    google_id=google_id,
-                    encrypted_refresh_token=encrypted_rt,
-                    is_wait_listed=True,
-                    username=None,
-                    )
+                google_id=google_id,
+                encrypted_refresh_token=encrypted_rt,
+                is_wait_listed=True,
+                username=None,
+            )
             session.add(new_user)
             session.commit()
             session.refresh(new_user)
@@ -175,14 +213,14 @@ async def google_callback(request: Request, code: str = None, error: str = None)
 
     if not user or user.id is None:
         raise HTTPException(
-                status_code=500, detail="Failed to retrieve user data after login/signup."
-                )
+            status_code=500, detail="Failed to retrieve user data after login/signup."
+        )
 
     jwt_payload = {
-            "sub": str(user.id),
-            "iat": datetime.now(timezone.utc),
-            "exp": datetime.now(timezone.utc) + timedelta(hours=1),
-            }
+        "sub": str(user.id),
+        "iat": datetime.now(timezone.utc),
+        "exp": datetime.now(timezone.utc) + timedelta(hours=1),
+    }
     platform_token = jwt.encode(jwt_payload, JWT_SECRET_KEY, algorithm="HS256")
 
     frontend_redirect_base = os.getenv("FRONTEND_URL", "http://localhost:3000")
@@ -199,7 +237,7 @@ async def google_callback(request: Request, code: str = None, error: str = None)
     #         <body>
     #             <h1>Login successful!</h1>
     #             <p>Cookie should be set. Check DevTools.</p>
-    #             <p>Token: {platform_token[:10]}...</p> 
+    #             <p>Token: {platform_token[:10]}...</p>
     #             <a href="{frontend_redirect_base}/profile-setup">Go to Profile Setup</a> <br/>
     #             <a href="{frontend_redirect_base}/home">Go to Home</a>
     #         </body>
@@ -207,14 +245,14 @@ async def google_callback(request: Request, code: str = None, error: str = None)
     # """
     # response = HTMLResponse(content=html_content)
     response.set_cookie(
-            key="access_token",
-            value=platform_token,
-            httponly=True,
-            secure=True if "https" in frontend_redirect_base else False,
-            samesite="Lax",
-            max_age=3600,
-            path="/",
-            )
+        key="access_token",
+        value=platform_token,
+        httponly=True,
+        secure=True if "https" in frontend_redirect_base else False,
+        samesite="Lax",
+        max_age=3600,
+        path="/",
+    )
     print(f"jwt cookie set (domain removed). redirecting to {redirect_url}")
     # print(f"JWT cookie set for domain 'localhost'. Redirecting to {redirect_url}")
     return response
@@ -228,13 +266,13 @@ async def logout(response: Response):
     print("logout requested, clearing the access token cookie.")
     frontend_redirect_base = os.getenv("FRONTEND_URL", "http://localhost:3000")
     response.delete_cookie(
-            key="access_token",
-            httponly=True,
-            secure=True if "https" in frontend_redirect_base else False,
-            samesite="Lax",
-            path="/",
-            )
-    return {"message" : "logout successful"}
+        key="access_token",
+        httponly=True,
+        secure=True if "https" in frontend_redirect_base else False,
+        samesite="Lax",
+        path="/",
+    )
+    return {"message": "logout successful"}
 
 
 # @router.post(
