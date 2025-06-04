@@ -6,9 +6,10 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import UserTags from "@/components/ui/user-tags";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Pencil } from "lucide-react";
+import { Pencil } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import PostItem, { type FetchedPost } from "../home/PostItem";
@@ -184,12 +185,22 @@ export default function ProfilePage() {
 					</AvatarFallback>
 				</Avatar>
 				<CardContent className="flex flex-col items-start ml-4 pt-0">
-					<h2 className="text-2xl font-bold">@{profile.username}</h2>
+					<div className="flex flex-col md:flex-row md:items-center md:gap-3 w-full">
+						<h2 className="text-2xl font-bold">
+							@{profile.username}
+						</h2>
+						<div className="hidden md:block">
+							<UserTags tags={profile.tags || []} />
+						</div>
+					</div>
 					{profile.bio && !isEditingBio && (
 						<p className="text-muted-foreground mt-2">
 							{profile.bio}
 						</p>
 					)}
+					<div className="block md:hidden mt-2">
+						<UserTags tags={profile.tags || []} />
+					</div>
 					{isEditingBio && (
 						<form
 							onSubmit={handleBioSubmit}

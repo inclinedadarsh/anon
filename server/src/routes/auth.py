@@ -13,6 +13,7 @@ from fastapi.responses import HTMLResponse
 # from src.services.email import load_email_template
 # from src.services.auth import hash_email
 from src.services.auth import encrypt_refresh_token
+from src.services.tags import assign_user_tags
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 
@@ -247,6 +248,15 @@ async def google_callback(
             session.refresh(new_user)
             user = new_user
             print(f"New user created: {user.id}")
+
+            # assign tags to new user
+            user_tags = assign_user_tags(user, signup_source)
+            if user_tags:
+                user.tags = user_tags
+                session.add(user)
+                session.commit()
+                session.refresh(user)
+                print(f"Tags assigned to user {user.id}: {user_tags}")
 
             if referrer_id and signup_source == "referral":
                 from src.services.referral import complete_referral_simple

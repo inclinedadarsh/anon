@@ -26,7 +26,7 @@ export function PageLayout({
 
 	return (
 		<main className="flex min-h-screen flex-col p-4 pt-4 md:p-8 md:pt-8 items-center">
-			<div className="w-full max-w-4xl flex justify-between items-center mb-8">
+			<div className="w-full max-w-2xl flex justify-between items-center mb-8">
 				{showBackButton ? (
 					<Button
 						variant="ghost"
@@ -73,7 +73,7 @@ export function PageLayout({
 					</div>
 				)}
 			</div>
-			<div className="w-full max-w-4xl space-y-4">{children}</div>
+			<div className="w-full max-w-2xl space-y-4">{children}</div>
 		</main>
 	);
 }
