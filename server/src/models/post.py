@@ -34,3 +34,5 @@ class PostPublic(PostBase):
     id: int
     created_at: datetime
     author: Author
+    score: int = 0  # upvotes - downvotes
+    user_vote: Optional[int] = None  # current user's vote (1, -1, none)

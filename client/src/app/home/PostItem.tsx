@@ -14,8 +14,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 
 interface PostAuthor {
 	author_id: string | number;
@@ -27,6 +28,8 @@ export interface FetchedPost {
 	content: string;
 	created_at: string;
 	author: PostAuthor;
+	score: number;
+	user_vote: number | null;
 }
 
 interface PostItemProps {
@@ -45,6 +48,10 @@ export default function PostItem({
 	const { user } = useAuth();
 	const { toast } = useToast();
 	const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+
+	const [score, setScore] = useState(post.score);
+	const [userVote, setUserVote] = useState(post.user_vote);
+	const [isVoting, setIsVoting] = useState(false);
 
 	const handleDelete = async () => {
 		try {
@@ -71,6 +78,60 @@ export default function PostItem({
 				description: "Failed to delete post",
 				variant: "destructive",
 			});
+		}
+	};
+
+	const handleVote = async (voteType: number) => {
+		if (isVoting) return;
+
+		setIsVoting(true);
+
+		const oldScore = score;
+		const oldUserVote = userVote;
+
+		try {
+			if (userVote === voteType) {
+				const response = await fetch(
+					`${backendUrl}/posts/${post.id}/vote`,
+					{
+						method: "DELETE",
+						credentials: "include",
+					},
+				);
+
+				if (!response.ok) throw new Error("Failed to remove vote");
+
+				const data = await response.json();
+				setScore(data.post.score);
+				setUserVote(null);
+			} else {
+				const response = await fetch(
+					`${backendUrl}/posts/${post.id}/vote`,
+					{
+						method: "PUT",
+						headers: { "Content-Type": "application/json" },
+						credentials: "include",
+						body: JSON.stringify({ vote_type: voteType }),
+					},
+				);
+
+				if (!response.ok) throw new Error("Failed to vote");
+
+				const data = await response.json();
+				setScore(data.post.score);
+				setUserVote(voteType);
+			}
+		} catch (error) {
+			setScore(oldScore);
+			setUserVote(oldUserVote);
+
+			toast({
+				title: "Error",
+				description: "Failed to vote on post",
+				variant: "destructive",
+			});
+		} finally {
+			setIsVoting(false);
 		}
 	};
 
@@ -149,6 +210,48 @@ export default function PostItem({
 							<p className="text-sm whitespace-pre-wrap">
 								{post.content}
 							</p>
+
+							<div className="flex items-center gap-1 mt-3 pt-2 border-t border-gray-100">
+								<Button
+									variant="ghost"
+									size="sm"
+									onClick={() => handleVote(1)}
+									disabled={isVoting}
+									className={`flex items-center gap-1 h-8 px-2 ${
+										userVote === 1
+											? "text-green-600 bg-green-50 hover:bg-green-100"
+											: "text-gray-500 hover:text-green-600 hover:bg-green-50"
+									}`}
+								>
+									<ChevronUp className="h-4 w-4" />
+								</Button>
+
+								<span
+									className={`text-sm font-medium min-w-[2rem] text-center ${
+										score > 0
+											? "text-green-600"
+											: score < 0
+												? "text-red-500"
+												: "text-gray-500"
+									}`}
+								>
+									{score}
+								</span>
+
+								<Button
+									variant="ghost"
+									size="sm"
+									onClick={() => handleVote(-1)}
+									disabled={isVoting}
+									className={`flex items-center gap-1 h-8 px-2 ${
+										userVote === -1
+											? "text-red-500 bg-red-50 hover:bg-red-100"
+											: "text-gray-500 hover:text-red-500 hover:bg-red-50"
+									}`}
+								>
+									<ChevronDown className="h-4 w-4" />
+								</Button>
+							</div>
 						</CardContent>
 					</div>
 				</div>

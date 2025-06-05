@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.db import create_db_and_tables
 from src.routes.posts import router as posts_router
+from src.routes.votes import router as votes_router
 from src.routes.auth import router as auth_router
 from src.routes.users import router as users_router
 from src.routes.test import router as test_router
@@ -34,6 +35,7 @@ app.add_middleware(
 
 
 app.include_router(posts_router, prefix="/posts", tags=["posts"])
+app.include_router(votes_router, prefix="/posts", tags=["votes"])
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(users_router, prefix="/users", tags=["users"])
 app.include_router(test_router, prefix="/test", tags=["test"])

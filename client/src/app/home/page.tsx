@@ -184,9 +184,9 @@ export default function HomePage() {
 				description: "Your post has been submitted.",
 			});
 			setPostContent("");
-			console.log("new post created:", responseData);
+			// console.log("new post created:", responseData);
 			fetchPosts(currentPage);
-			console.log("fetched new posts...");
+			// console.log("fetched new posts...");
 		} catch (error: unknown) {
 			console.log("failed to create post: ", error);
 			const message =
