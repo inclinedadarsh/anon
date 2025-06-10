@@ -16,7 +16,7 @@ def assign_user_tags(user: User, signup_source: Optional[str] = None) -> List[st
     tags = []
 
     # builder tag will be assigned to two users only. there google id's are hardcoded.
-    BUILDER_GOOGLE_IDS = ["114562794821224414483"]
+    BUILDER_GOOGLE_IDS = ["114562794821224414483", "106555285411629950007"]
     if user.google_id and user.google_id in BUILDER_GOOGLE_IDS:
         tags.append("builder")
 
