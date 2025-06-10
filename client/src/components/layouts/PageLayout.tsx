@@ -1,5 +1,6 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/context/AuthContext";
 import { ArrowLeft, LogOut, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -23,6 +24,7 @@ export function PageLayout({
 	getInitials,
 }: PageLayoutProps) {
 	const router = useRouter();
+	const { user } = useAuth();
 
 	return (
 		<main className="flex min-h-screen flex-col p-4 pt-4 md:p-8 md:pt-8 items-center">
@@ -44,7 +46,10 @@ export function PageLayout({
 									variant="ghost"
 									className="flex items-center space-x-2 p-2"
 								>
-									<Avatar className="h-8 w-8">
+									<Avatar
+										seed={user?.avatar_seed || undefined}
+										className="h-8 w-8"
+									>
 										<AvatarFallback>
 											{getInitials(username)}
 										</AvatarFallback>

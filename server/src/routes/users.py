@@ -77,7 +77,7 @@ def set_my_username(
     if not re.match(r"^[a-zA-Z0-9_]+$", username_data.username):
         raise HTTPException(status_code=422, detail="Invalid username format.")
 
-    # set the username
+    # set the username and avatar seed
     current_user.username = username_data.username
     current_user.avatar_seed = username_data.avatar_seed
     session.add(current_user)

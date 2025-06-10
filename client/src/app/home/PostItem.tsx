@@ -21,6 +21,7 @@ import { useState } from "react";
 interface PostAuthor {
 	author_id: string | number;
 	username: string;
+	avatar_seed?: string | null;
 }
 
 export interface FetchedPost {
@@ -148,7 +149,10 @@ export default function PostItem({
 						href={`/${post.author.username}`}
 						className="flex-shrink-0"
 					>
-						<Avatar className="h-10 w-10 cursor-pointer">
+						<Avatar
+							seed={post.author.avatar_seed || undefined}
+							className="h-10 w-10 cursor-pointer"
+						>
 							<AvatarFallback>
 								{getInitials(post.author.username)}
 							</AvatarFallback>

@@ -1,4 +1,9 @@
 "use client";
+import {
+	Avatar,
+	AvatarFallback,
+	getDiceBearAvatarUrl,
+} from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,11 +14,16 @@ import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useState } from "react";
 
+function randomSeed() {
+	return Math.random().toString(36).substring(2, 12);
+}
+
 export default function ProfileSetupPage() {
 	const [username, setUsername] = useState("");
 	const [bio, setBio] = useState("");
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [avatarSeed, setAvatarSeed] = useState<string>("");
 	const router = useRouter();
 	const { toast } = useToast();
 	const {
@@ -40,6 +50,14 @@ export default function ProfileSetupPage() {
 		}
 	}, [currentUser, isAuthLoading, router]);
 
+	useEffect(() => {
+		setAvatarSeed(randomSeed());
+	}, []);
+
+	const handleRegenerateAvatar = () => {
+		setAvatarSeed(randomSeed());
+	};
+
 	const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		setIsLoading(true);
@@ -60,7 +78,10 @@ export default function ProfileSetupPage() {
 						"Content-Type": "application/json",
 					},
 					credentials: "include",
-					body: JSON.stringify({ username: username }),
+					body: JSON.stringify({
+						username: username,
+						avatar_seed: avatarSeed,
+					}),
 				},
 			);
 
@@ -131,6 +152,22 @@ export default function ProfileSetupPage() {
 						Choose your unique username and add a bio to get
 						started.
 					</p>
+				</div>
+				<div className="flex flex-col items-center gap-2">
+					<Avatar seed={avatarSeed} className="h-20 w-20">
+						<AvatarFallback>
+							{username ? username.charAt(0).toUpperCase() : "?"}
+						</AvatarFallback>
+					</Avatar>
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						onClick={handleRegenerateAvatar}
+						disabled={isLoading}
+					>
+						Regenerate Avatar
+					</Button>
 				</div>
 				<form onSubmit={handleSubmit} className="space-y-4">
 					<div>

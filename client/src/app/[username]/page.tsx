@@ -20,6 +20,7 @@ interface UserProfile {
 	is_wait_listed: boolean;
 	tags: string[] | null;
 	bio: string | null;
+	avatar_seed?: string | null;
 }
 
 export default function ProfilePage() {
@@ -40,6 +41,8 @@ export default function ProfilePage() {
 	const [totalPosts, setTotalPosts] = useState(0);
 	const postsPerPage = 10;
 	const { toast } = useToast();
+	const [isChangingAvatar, setIsChangingAvatar] = useState(false);
+	const [newAvatarSeed, setNewAvatarSeed] = useState<string>("");
 
 	useEffect(() => {
 		if (!username) return;
@@ -50,6 +53,7 @@ export default function ProfilePage() {
 				is_wait_listed: currentUser.is_wait_listed,
 				tags: currentUser.tags,
 				bio: currentUser.bio || null,
+				avatar_seed: currentUser.avatar_seed,
 			});
 			setLoading(false);
 		} else {
@@ -148,6 +152,42 @@ export default function ProfilePage() {
 		}
 	};
 
+	const handleRegenerateAvatar = () => {
+		setNewAvatarSeed(Math.random().toString(36).substring(2, 12));
+	};
+
+	const handleSaveAvatar = async () => {
+		if (!backendUrl || !newAvatarSeed) return;
+		setIsChangingAvatar(true);
+		const prevSeed = profile?.avatar_seed;
+		setProfile(prev =>
+			prev ? { ...prev, avatar_seed: newAvatarSeed } : prev,
+		);
+		try {
+			const response = await fetch(`${backendUrl}/users/me/avatar`, {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				credentials: "include",
+				body: JSON.stringify({ avatar_seed: newAvatarSeed }),
+			});
+			if (!response.ok) throw new Error("Failed to update avatar");
+			await refetchUser();
+			toast({ title: "Success", description: "Avatar updated!" });
+			setNewAvatarSeed("");
+		} catch (err) {
+			setProfile(prev =>
+				prev ? { ...prev, avatar_seed: prevSeed } : prev,
+			);
+			toast({
+				title: "Error",
+				description: "Failed to update avatar",
+				variant: "destructive",
+			});
+		} finally {
+			setIsChangingAvatar(false);
+		}
+	};
+
 	if (loading)
 		return (
 			<main className="flex min-h-screen items-center justify-center">
@@ -179,39 +219,55 @@ export default function ProfilePage() {
 							<Pencil className="h-4 w-4" />
 						</Button>
 					)}
-				<Avatar className="h-20 w-20">
-					<AvatarFallback>
-						{getInitials(profile.username)}
-					</AvatarFallback>
-				</Avatar>
-				<CardContent className="flex flex-col items-start ml-4 pt-0">
-					<div className="flex flex-col md:flex-row md:items-center md:gap-3 w-full">
-						<h2 className="text-2xl font-bold">
-							@{profile.username}
-						</h2>
-						<div className="hidden md:block">
-							<UserTags tags={profile.tags || []} />
+				{isEditingBio ? (
+					<form
+						onSubmit={handleBioSubmit}
+						className="w-full flex flex-col md:flex-row md:items-start gap-4 mt-2"
+					>
+						<div className="flex flex-col items-center md:items-start gap-2 md:mr-4">
+							<Avatar
+								seed={
+									(newAvatarSeed ||
+										profile.avatar_seed ||
+										undefined) as string | undefined
+								}
+								className="h-20 w-20"
+							>
+								<AvatarFallback>
+									{getInitials(profile.username)}
+								</AvatarFallback>
+							</Avatar>
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								onClick={handleRegenerateAvatar}
+								disabled={isChangingAvatar}
+								className="w-full md:w-auto"
+							>
+								Regenerate Avatar
+							</Button>
+							{newAvatarSeed && (
+								<Button
+									type="button"
+									size="sm"
+									className="w-full md:w-auto"
+									onClick={handleSaveAvatar}
+									disabled={isChangingAvatar}
+								>
+									{isChangingAvatar
+										? "Saving..."
+										: "Save Avatar"}
+								</Button>
+							)}
 						</div>
-					</div>
-					{profile.bio && !isEditingBio && (
-						<p className="text-muted-foreground mt-2">
-							{profile.bio}
-						</p>
-					)}
-					<div className="block md:hidden mt-2">
-						<UserTags tags={profile.tags || []} />
-					</div>
-					{isEditingBio && (
-						<form
-							onSubmit={handleBioSubmit}
-							className="w-full max-w-md mt-2"
-						>
+						<div className="flex-1">
 							<Textarea
 								value={newBio}
 								onChange={e => setNewBio(e.target.value)}
 								placeholder="Write something about yourself..."
 								maxLength={140}
-								className="resize-none"
+								className="resize-none w-full"
 							/>
 							<div className="flex justify-between items-center mt-2">
 								<p className="text-sm text-muted-foreground">
@@ -236,9 +292,42 @@ export default function ProfilePage() {
 									</Button>
 								</div>
 							</div>
-						</form>
-					)}
-				</CardContent>
+						</div>
+					</form>
+				) : (
+					<>
+						<Avatar
+							seed={
+								(profile.avatar_seed || undefined) as
+									| string
+									| undefined
+							}
+							className="h-20 w-20"
+						>
+							<AvatarFallback>
+								{getInitials(profile.username)}
+							</AvatarFallback>
+						</Avatar>
+						<CardContent className="flex flex-col items-start ml-4 pt-0">
+							<div className="flex flex-col md:flex-row md:items-center md:gap-3 w-full">
+								<h2 className="text-2xl font-bold">
+									@{profile.username}
+								</h2>
+								<div className="hidden md:block">
+									<UserTags tags={profile.tags || []} />
+								</div>
+							</div>
+							{profile.bio && (
+								<p className="text-muted-foreground mt-2">
+									{profile.bio}
+								</p>
+							)}
+							<div className="block md:hidden mt-2">
+								<UserTags tags={profile.tags || []} />
+							</div>
+						</CardContent>
+					</>
+				)}
 			</Card>
 
 			{currentUser?.username === profile.username && (
