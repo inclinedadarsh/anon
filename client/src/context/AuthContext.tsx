@@ -16,6 +16,8 @@ interface UserProfile {
 	username: string | null;
 	is_wait_listed: boolean;
 	tags: string[] | null;
+	bio: string | null;
+	avatar_seed: string | null;
 }
 
 interface AuthContextType {

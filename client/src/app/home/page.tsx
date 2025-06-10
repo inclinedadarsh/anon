@@ -1,5 +1,6 @@
 "use client";
 
+import { PageLayout } from "@/components/layouts/PageLayout";
 import { ProtectedRoute } from "@/components/ui/ProtectedRoute";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -14,8 +15,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { UserRound } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useState } from "react";
+import PostItem, { type FetchedPost } from "./PostItem";
+
 interface UserProfile {
 	id: number;
 	username: string | null;
@@ -32,11 +36,11 @@ interface PostAuthor {
 	username: string;
 }
 
-interface FetchedPost {
-	id: number;
-	content: string;
-	created_at: string;
-	author: PostAuthor;
+interface PaginatedResponse {
+	items: FetchedPost[];
+	total: number;
+	limit: number;
+	offset: number;
 }
 
 export default function HomePage() {
@@ -50,6 +54,9 @@ export default function HomePage() {
 		null,
 	);
 	const [isLoggingOut, setIsLoggingOut] = useState(false);
+	const [currentPage, setCurrentPage] = useState(1);
+	const [totalPosts, setTotalPosts] = useState(0);
+	const postsPerPage = 10;
 
 	const router = useRouter();
 	const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -62,56 +69,73 @@ export default function HomePage() {
 		}
 	}, [user, router]);
 
-	const fetchPosts = async () => {
-		if (!user || !user.username || !backendUrl) {
-			setIsLoadingPosts(false);
-			return;
-		}
-		setIsLoadingPosts(true);
-		setErrorLoadingPosts(null);
-		try {
-			const response = await fetch(`${backendUrl}/posts/`, {
-				method: "GET",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				credentials: "include",
-			});
+	const handleLogout = useCallback(async () => {
+		setIsLoggingOut(true);
+		await logout();
+	}, [logout]);
 
-			if (!response.ok) {
-				if (response.status === 401 || response.status === 403) {
-					console.error("Auth error fetching posts. logging out.");
-					await handleLogout();
-					return;
-				}
-				const responseData = await response.json().catch(() => ({}));
-				throw new Error(
-					responseData.detail || `Error ${response.status}`,
-				);
+	const fetchPosts = useCallback(
+		async (page: number) => {
+			if (!user?.username || !backendUrl) {
+				setIsLoadingPosts(false);
+				return;
 			}
+			setIsLoadingPosts(true);
+			setErrorLoadingPosts(null);
+			try {
+				const offset = (page - 1) * postsPerPage;
+				const response = await fetch(
+					`${backendUrl}/posts/?limit=${postsPerPage}&offset=${offset}`,
+					{
+						method: "GET",
+						headers: {
+							"Content-Type": "application/json",
+						},
+						credentials: "include",
+					},
+				);
 
-			const postData: FetchedPost[] = await response.json();
-			setPosts(postData);
-		} catch (error: unknown) {
-			console.error("failed to fetch posts: ", error);
-			const message =
-				error instanceof Error ? error.message : "could not load posts";
-			setErrorLoadingPosts(message);
-		} finally {
-			setIsLoadingPosts(false);
-		}
-	};
+				if (!response.ok) {
+					if (response.status === 401 || response.status === 403) {
+						console.error(
+							"Auth error fetching posts. logging out.",
+						);
+						await handleLogout();
+						return;
+					}
+					const responseData = await response
+						.json()
+						.catch(() => ({}));
+					throw new Error(
+						responseData.detail || `Error ${response.status}`,
+					);
+				}
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
+				const data: PaginatedResponse = await response.json();
+				setPosts(data.items);
+				setTotalPosts(data.total);
+			} catch (error: unknown) {
+				console.error("failed to fetch posts: ", error);
+				const message =
+					error instanceof Error
+						? error.message
+						: "could not load posts";
+				setErrorLoadingPosts(message);
+			} finally {
+				setIsLoadingPosts(false);
+			}
+		},
+		[user, backendUrl, handleLogout],
+	);
+
 	useEffect(() => {
-		// biome-ignore lint/complexity/useOptionalChain: <explanation>
-		if (user && user.username) {
-			fetchPosts();
+		if (user?.username) {
+			fetchPosts(currentPage);
 		} else {
 			setPosts([]);
 			setIsLoadingPosts(false);
 		}
-	}, [user]);
+	}, [user, currentPage, fetchPosts]);
 
 	const handlePostSubmit = async (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
@@ -160,9 +184,9 @@ export default function HomePage() {
 				description: "Your post has been submitted.",
 			});
 			setPostContent("");
-			console.log("new post created:", responseData);
-			fetchPosts();
-			console.log("fetched new posts...");
+			// console.log("new post created:", responseData);
+			fetchPosts(currentPage);
+			// console.log("fetched new posts...");
 		} catch (error: unknown) {
 			console.log("failed to create post: ", error);
 			const message =
@@ -178,11 +202,6 @@ export default function HomePage() {
 		} finally {
 			setIsPosting(false);
 		}
-	};
-
-	const handleLogout = async () => {
-		setIsLoggingOut(true);
-		await logout();
 	};
 
 	const formatDate = (dateString: string) => {
@@ -201,6 +220,8 @@ export default function HomePage() {
 		return name?.charAt(0).toUpperCase() || "?";
 	};
 
+	const totalPages = Math.ceil(totalPosts / postsPerPage);
+
 	if (user && !user.username) {
 		return (
 			<main className="flex min-h-screen flex-col items-center justify-center p-24">
@@ -211,116 +232,106 @@ export default function HomePage() {
 
 	return (
 		<ProtectedRoute>
-			<main className="flex min-h-screen flex-col p-6 pt-12 md:p-24 items-center">
-				<div className="w-full max-w- space-y-8">
-					<h1 className="text-3xl font-bold">
-						Supp, {user?.username}. Been a minute.
-					</h1>
+			<PageLayout
+				username={user?.username}
+				onLogout={handleLogout}
+				isLoggingOut={isLoggingOut}
+				getInitials={getInitials}
+			>
+				<h1 className="text-3xl font-bold">
+					Supp, {user?.username}. Been a minute.
+				</h1>
 
-					<Button
-						variant="outline"
-						onClick={handleLogout}
-						disabled={isLoggingOut}
-					>
-						{isLoggingOut ? "Logging out.." : "Logout"}
-					</Button>
-
-					<form onSubmit={handlePostSubmit} className="space-y-3">
-						<Textarea
-							placeholder="What's on your mind? Share anonymously..."
-							value={postContent}
-							onChange={event =>
-								setPostContent(event.target.value)
-							}
-							required
-							rows={4}
-							disabled={isPosting}
-							className="resize-none focus-visible:ring-0"
-						/>
-						{errorPost && (
-							<p className="text-sm text-destructive">
-								{errorPost}
-							</p>
-						)}
-						<div className="flex justify-end">
-							<Button
-								type="submit"
-								disabled={isPosting || !postContent.trim()}
-							>
-								{isPosting ? "Posting..." : "Post Anonymously"}
-							</Button>
+				<form onSubmit={handlePostSubmit} className="space-y-3">
+					<Textarea
+						placeholder="What's on your mind? Share anonymously..."
+						value={postContent}
+						onChange={event =>
+							setPostContent(event.target.value.slice(0, 420))
+						}
+						required
+						rows={4}
+						disabled={isPosting}
+						className="resize-none focus-visible:ring-0"
+						maxLength={420}
+					/>
+					<div className="flex items-center">
+						<div className="flex-1">
+							{postContent.length > 0 && (
+								<p className="text-sm text-muted-foreground">
+									{420 - postContent.length} characters
+									remaining
+								</p>
+							)}
 						</div>
-					</form>
-
-					<div className="pt-8 space-y-4">
-						{isLoadingPosts && <p>Loading posts...</p>}
-
-						{errorLodingPosts && (
-							<p className="text-destructive">
-								Error loading posts: {errorLodingPosts}
-							</p>
-						)}
-
-						{!isLoadingPosts &&
-							!errorLodingPosts &&
-							posts.map(post => (
-								// <Card key={post.id} className="rounded-none shadow-none border-none border-gray-200">
-								//     <CardHeader className="flex flex-row items-center space-x-3 pb-2">
-								//         <Avatar>
-								//             <AvatarFallback>
-								//             {getInitials(post.author.username)}
-								//             </AvatarFallback>
-								//         </Avatar>
-								//         <div className="flex flex-col">
-								//             <CardTitle className="text-sm font-medium">
-								//                 {post.author.username}
-								//             </CardTitle>
-								//             <p className="text-xs text-muted-foreground">
-								//                 {formatDate(post.created_at)}
-								//             </p>
-								//         </div>
-								//     </CardHeader>
-								//     <CardContent>
-								//         <p className="whitespace-pre-wrap">{post.content}</p>
-								//     </CardContent>
-								// </Card>
-								<Card
-									key={post.id}
-									className="border-none rounded-none shadow-none border-b border-gray-200 pb-4"
-								>
-									<CardHeader className="p-0 pb-2">
-										<div className="flex space-x-3">
-											<Avatar className="h-10 w-10 mt-1">
-												<AvatarFallback>
-													{getInitials(
-														post.author.username,
-													)}
-												</AvatarFallback>
-											</Avatar>
-											<div className="flex flex-col flex-1">
-												<div className="flex items-center justify-between">
-													<CardTitle className="text-sm font-medium">
-														{post.author.username}
-													</CardTitle>
-													<p className="text-xs text-muted-foreground">
-														{formatDate(
-															post.created_at,
-														)}
-													</p>
-												</div>
-												<CardContent className="p-0 pt-1">
-													<p className="text-sm whitespace-pre-wrap">
-														{post.content}
-													</p>
-												</CardContent>
-											</div>
-										</div>
-									</CardHeader>
-								</Card>
-							))}
+						<Button
+							type="submit"
+							disabled={isPosting || !postContent.trim()}
+						>
+							{isPosting ? "Posting..." : "Post Anonymously"}
+						</Button>
 					</div>
+					{errorPost && (
+						<p className="text-sm text-destructive">{errorPost}</p>
+					)}
+				</form>
+
+				<div className="pt-8 space-y-4">
+					{isLoadingPosts && <p>Loading posts...</p>}
+
+					{errorLodingPosts && (
+						<p className="text-destructive">
+							Error loading posts: {errorLodingPosts}
+						</p>
+					)}
+
+					{!isLoadingPosts && !errorLodingPosts && (
+						<>
+							{posts.map(post => (
+								<PostItem
+									key={post.id}
+									post={post}
+									getInitials={getInitials}
+									formatDate={formatDate}
+									onPostDeleted={() =>
+										fetchPosts(currentPage)
+									}
+								/>
+							))}
+
+							{totalPages > 1 && (
+								<div className="flex justify-center gap-2 mt-4">
+									<Button
+										variant="outline"
+										onClick={() =>
+											setCurrentPage(p =>
+												Math.max(1, p - 1),
+											)
+										}
+										disabled={currentPage === 1}
+									>
+										Previous
+									</Button>
+									<span className="flex items-center px-4">
+										Page {currentPage} of {totalPages}
+									</span>
+									<Button
+										variant="outline"
+										onClick={() =>
+											setCurrentPage(p =>
+												Math.min(totalPages, p + 1),
+											)
+										}
+										disabled={currentPage === totalPages}
+									>
+										Next
+									</Button>
+								</div>
+							)}
+						</>
+					)}
 				</div>
-			</main>
+			</PageLayout>
 		</ProtectedRoute>
 	);
 }

@@ -5,10 +5,16 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+function getDiceBearAvatarUrl(seed: string, style = "thumbs") {
+	return `https://api.dicebear.com/7.x/${style}/svg?seed=${encodeURIComponent(seed)}`;
+}
+
 const Avatar = React.forwardRef<
 	React.ElementRef<typeof AvatarPrimitive.Root>,
-	React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Root>
->(({ className, ...props }, ref) => (
+	React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Root> & {
+		seed?: string;
+	}
+>(({ className, seed, children, ...props }, ref) => (
 	<AvatarPrimitive.Root
 		ref={ref}
 		className={cn(
@@ -16,7 +22,17 @@ const Avatar = React.forwardRef<
 			className,
 		)}
 		{...props}
-	/>
+	>
+		{seed ? (
+			<AvatarPrimitive.Image
+				src={getDiceBearAvatarUrl(seed)}
+				alt="User avatar"
+				className={cn("aspect-square h-full w-full")}
+			/>
+		) : (
+			children
+		)}
+	</AvatarPrimitive.Root>
 ));
 Avatar.displayName = AvatarPrimitive.Root.displayName;
 
@@ -47,4 +63,4 @@ const AvatarFallback = React.forwardRef<
 ));
 AvatarFallback.displayName = AvatarPrimitive.Fallback.displayName;
 
-export { Avatar, AvatarImage, AvatarFallback };
+export { Avatar, AvatarImage, AvatarFallback, getDiceBearAvatarUrl };

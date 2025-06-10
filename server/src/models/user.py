@@ -10,6 +10,7 @@ from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
 class UserBase(SQLModel):
     # TODO: Give it constraints
     username: Optional[str] = Field(default=None, index=True, unique=True)
+    bio: Optional[str] = Field(default=None, max_length=140)
 
 
 class User(UserBase, table=True):
@@ -17,15 +18,16 @@ class User(UserBase, table=True):
     google_id: Optional[str] = Field(
         default=None, index=True, unique=True, nullable=True
     )
-    encrypted_refresh_token: Optional[str] = Field(
-        default=None, sa_column=Column(Text)
-    )
-    is_wait_listed: bool = Field(default=False) # true for users who have joined wait list
+    encrypted_refresh_token: Optional[str] = Field(default=None, sa_column=Column(Text))
     verification_token: Optional[str] = Field(nullable=True)
     verification_token_expires: Optional[datetime] = Field(nullable=True)
     tags: Optional[List[str]] = Field(
         default=None, sa_column=Column(PG_ARRAY(String()))
     )
+    referral_code: Optional[str] = Field(default=None, unique=True, max_length=8)
+    referred_by: Optional[int] = Field(default=None, foreign_key="user.id")
+    referral_count: int = Field(default=0)
+    avatar_seed: Optional[str] = Field(default=None, nullable=True)
     # NOTE: The `tags` property is just an array of strings, however it should have been an array of
     # foreign keys "tag.key"
     # As of 12/3/25, it's not supported in SQLAlchemy / SQLModel, hence it's just an array of strings
@@ -48,9 +50,10 @@ class User(UserBase, table=True):
 
 class UserPublic(UserBase):
     id: int
-    is_wait_listed: bool
     tags: Optional[List[str]] = None
-
+    referral_code: Optional[str] = None
+    referral_count: int = 0
+    avatar_seed: Optional[str] = None
 
 # class UserLoginRequest(SQLModel):
 #     username: str
