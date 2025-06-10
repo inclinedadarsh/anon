@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/context/AuthContext";
+import { GoogleAnalytics } from "@next/third-parties/google";
 
 const inter = Inter({
 	variable: "--font-sans",
@@ -21,6 +22,7 @@ export default function RootLayout({
 }>) {
 	return (
 		<html lang="en">
+			<GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_ID || ""} />
 			<body className={`${inter.className} antialiased`}>
 				<AuthProvider>
 					{children}

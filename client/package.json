@@ -11,6 +11,7 @@
 		"prepare": "cd .. && husky client/.husky"
 	},
 	"dependencies": {
+		"@next/third-parties": "^15.3.3",
 		"@radix-ui/react-alert-dialog": "^1.1.13",
 		"@radix-ui/react-avatar": "^1.1.6",
 		"@radix-ui/react-label": "^2.1.3",
