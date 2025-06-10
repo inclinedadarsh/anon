@@ -11,7 +11,8 @@ load_dotenv(find_dotenv())
 
 
 DATABASE_URL = os.getenv("DATABASE_URL")
-engine = create_engine(DATABASE_URL, echo=True)
+ECHO = os.getenv("ECHO", "false")
+engine = create_engine(DATABASE_URL, echo=ECHO)
 
 
 def create_db_and_tables():
