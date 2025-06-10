@@ -275,7 +275,7 @@ async def google_callback(
     jwt_payload = {
         "sub": str(user.id),
         "iat": datetime.now(timezone.utc),
-        "exp": datetime.now(timezone.utc) + timedelta(hours=1),
+        "exp": datetime.now(timezone.utc) + timedelta(days=7),
     }
     platform_token = jwt.encode(jwt_payload, JWT_SECRET_KEY, algorithm="HS256")
 
@@ -293,7 +293,7 @@ async def google_callback(
         httponly=True,
         secure=True if "https" in frontend_redirect_base else False,
         samesite="Lax",
-        max_age=3600,
+        max_age=7 * 24 * 60 * 60,
         path="/",
     )
     print(f"jwt cookie set (domain removed). redirecting to {redirect_url}")
