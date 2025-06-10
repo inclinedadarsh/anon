@@ -161,11 +161,6 @@ async def google_callback(
             detail="Could not verify Google ID token.",
         )
 
-    if not email.endswith("@kkwagh.edu.in"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access restricted to @kkwagh.edu.in emails only.",
-        )
 
     user = None
     with Session(engine) as session:
@@ -180,6 +175,13 @@ async def google_callback(
                 session.refresh(user)
             print(f"Existing user logged in: {user.id}")
     else:
+        
+        if not email.endswith("@kkwagh.edu.in"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access restricted to @kkwagh.edu.in emails only.",
+            )
+
         allowed_to_signup = False
         signup_source = None
         referrer_id = None
