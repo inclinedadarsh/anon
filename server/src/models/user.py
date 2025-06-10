@@ -27,6 +27,7 @@ class User(UserBase, table=True):
     referral_code: Optional[str] = Field(default=None, unique=True, max_length=8)
     referred_by: Optional[int] = Field(default=None, foreign_key="user.id")
     referral_count: int = Field(default=0)
+    avatar_seed: Optional[int] = Field(default=None, nullable=True)
     # NOTE: The `tags` property is just an array of strings, however it should have been an array of
     # foreign keys "tag.key"
     # As of 12/3/25, it's not supported in SQLAlchemy / SQLModel, hence it's just an array of strings
@@ -52,7 +53,7 @@ class UserPublic(UserBase):
     tags: Optional[List[str]] = None
     referral_code: Optional[str] = None
     referral_count: int = 0
-
+    avatar_seed: Optional[str] = None
 
 # class UserLoginRequest(SQLModel):
 #     username: str

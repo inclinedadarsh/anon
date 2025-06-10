@@ -1,6 +1,6 @@
 from typing import Optional
 from sqlmodel import SQLModel, Field
-from datetime import datetime, timezone
+from datetime import datetime
 import sqlalchemy as sa
 from pydantic import Field as PydanticField
 
@@ -28,6 +28,7 @@ class PostCreate(PostBase):
 class Author(SQLModel):
     author_id: int
     username: str
+    avatar_seed: Optional[str] = None
 
 
 class PostPublic(PostBase):

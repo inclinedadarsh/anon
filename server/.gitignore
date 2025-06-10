@@ -13,3 +13,4 @@ database.db
 
 # Environment variables
 .env
+.envrc

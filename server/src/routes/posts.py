@@ -43,7 +43,7 @@ def create_post_public_with_votes(
 
     return PostPublic(
         **post.model_dump(),
-        author=Author(author_id=author.id, username=author.username),
+        author=Author(author_id=author.id, username=author.username, avatar_seed=author.avatar_seed),
         score=score,
         user_vote=user_vote
     )
@@ -102,7 +102,7 @@ def get_posts(
                 id=post.id,
                 content=post.content,
                 created_at=post.created_at,
-                author=Author(author_id=author.id, username=author.username),
+                author=Author(author_id=author.id, username=author.username, avatar_seed=author.avatar_seed),
                 score=score,
                 user_vote=user_vote,
             )

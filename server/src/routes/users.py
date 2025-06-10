@@ -12,10 +12,15 @@ router = APIRouter()
 
 class SetUsernameRequest(BaseModel):
     username: str = Field(..., min_length=4, max_length=15, pattern=r"^[a-zA-Z0-9_]+$")
+    avatar_seed: str = Field(..., min_length=1)
 
 
 class SetBioRequest(BaseModel):
     bio: str = Field(..., max_length=140)
+
+
+class SetAvatarRequest(BaseModel):
+    avatar_seed: str = Field(..., min_length=1)
 
 
 @router.get("/", response_model=List[UserPublic], status_code=status.HTTP_200_OK)
@@ -74,6 +79,7 @@ def set_my_username(
 
     # set the username
     current_user.username = username_data.username
+    current_user.avatar_seed = username_data.avatar_seed
     session.add(current_user)
     session.commit()
     session.refresh(current_user)
@@ -118,4 +124,18 @@ def read_users_me(current_user: User = Depends(get_current_user)):
     """
     Get the profile data for the currently authenticated user.
     """
+    return current_user
+
+@router.patch("/me/avatar", response_model=UserPublic, status_code=status.HTTP_200_OK) 
+def set_my_avatar(avatar_data: SetAvatarRequest, current_user: User = Depends(get_current_user), session: Session = Depends(lambda: Session(engine))): 
+    """ 
+    Sets or updates the avatar seed for the currently authenticated user. 
+    """ 
+    current_user.avatar_seed = avatar_data.avatar_seed 
+    session.add(current_user) 
+    session.commit() 
+    session.refresh(current_user) 
+    session.close() 
+
+    print(f"Avatar seed updated for user {current_user.id}") 
     return current_user
